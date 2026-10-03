@@ -1,0 +1,2548 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧排課系統 · AI 全校課表自動編排</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231C6B57'/%3E%3Crect x='7' y='8' width='18' height='17' rx='2' fill='none' stroke='%23F6F4EC' stroke-width='2'/%3E%3Cpath d='M7 13h18M12 8v-3M20 8v-3' stroke='%23F6F4EC' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M11 18h4M11 21h7' stroke='%23E8B44A' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* ============ 設計 token ============ */
+:root{
+  --paper:#F5F3EA; --paper2:#EDEAE0; --card:#FFFDF7; --ink:#20302B; --ink2:#4D5D56; --ink3:#7C877F;
+  --line:#DDD8C8; --line2:#C9C3B0;
+  --pine:#1C6B57; --pine-d:#13513F; --pine-l:#E1EEE7; --pine-ll:#EFF6F1;
+  --cinnabar:#BE4A2E; --cinnabar-l:#F8E7E1;
+  --gold:#A87E27; --gold-l:#F5EBD3;
+  --blue:#2F6E8C; --blue-l:#E4EEF3;
+  --shadow:0 1px 2px rgba(32,48,43,.06),0 4px 14px rgba(32,48,43,.06);
+  --shadow-lg:0 8px 30px rgba(32,48,43,.16);
+  --r:10px; --r-sm:7px;
+  --sidebar-w:238px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif;
+  background:var(--paper); color:var(--ink); font-size:14.5px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:inherit}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
+a{color:var(--pine);text-decoration:none}
+h1,h2,h3,h4{font-weight:700;line-height:1.35}
+::selection{background:var(--pine);color:#fff}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+
+/* ============ 版面 ============ */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;background:#173F35;color:#CFDCD5;
+  display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:40;
+}
+.sidebar .brand{padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,.09)}
+.sidebar .brand .logo{display:flex;align-items:center;gap:10px}
+.sidebar .brand .logo svg{flex-shrink:0}
+.sidebar .brand b{color:#F6F4EC;font-size:16.5px;letter-spacing:.5px;display:block}
+.sidebar .brand small{color:#8FA79E;font-size:11.5px;letter-spacing:1.5px}
+.nav{flex:1;overflow-y:auto;padding:10px 10px 20px}
+.nav .nav-group{font-size:11px;color:#7E948B;letter-spacing:2px;padding:14px 10px 5px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:8.5px 10px;border-radius:8px;color:#CFDCD5;font-size:13.8px;margin:1px 0;position:relative;
+}
+.nav-item svg{flex-shrink:0;opacity:.75}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:var(--pine);color:#fff;font-weight:500}
+.nav-item.active svg{opacity:1}
+.nav-item .num{
+  width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:11px;
+}
+.nav-item.active .num{border-color:#fff;background:rgba(255,255,255,.18)}
+.nav-item.done .num{background:var(--gold);border-color:var(--gold);color:#173F35}
+.nav-item.done .num::after{content:'✓';font-size:11px;font-weight:700}
+.nav-item.done .num span{display:none}
+.side-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.09);font-size:11.5px;color:#8FA79E;line-height:1.7}
+.side-foot b{color:#D9C28A;font-weight:500}
+
+.main{flex:1;margin-left:var(--sidebar-w);display:flex;flex-direction:column;min-width:0}
+.topbar{
+  height:60px;background:rgba(255,253,247,.92);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;
+  padding:0 26px;position:sticky;top:0;z-index:30;
+}
+.topbar h1{font-size:17px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar h1 .crumb{color:var(--ink3);font-weight:400;font-size:13px;margin-right:8px}
+.hamburger{display:none}
+.content{flex:1;padding:26px 30px 60px;max-width:1280px;width:100%;margin:0 auto}
+.page-foot{border-top:1px solid var(--line);padding:16px 30px;text-align:center;color:var(--ink3);font-size:12.5px;background:var(--paper2)}
+.page-foot b{color:var(--cinnabar);font-weight:700;letter-spacing:1px}
+
+/* ============ 通用元件 ============ */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px;margin-bottom:18px}
+.card > h2{font-size:16.5px;margin-bottom:4px;display:flex;align-items:center;gap:9px}
+.card > h2 .step-tag{background:var(--pine);color:#fff;font-size:11.5px;border-radius:5px;padding:2px 8px;font-weight:500;letter-spacing:1px}
+.card > .sub{color:var(--ink2);font-size:13px;margin-bottom:16px}
+.card h3{font-size:14.5px;margin:18px 0 10px;color:var(--pine-d)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+label.fld{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:9px}
+label.fld b{color:var(--ink);font-weight:500;display:block;margin-bottom:4px}
+input[type=text],input[type=number],input[type=password],input[type=time],input[type=date],select,textarea{
+  width:100%;border:1px solid var(--line2);border-radius:var(--r-sm);padding:8px 10px;background:#fff;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--pine);outline:none;box-shadow:0 0 0 3px rgba(28,107,87,.12)}
+input[type=number]{width:100%}
+input[type=checkbox]{accent-color:var(--pine);width:15px;height:15px;vertical-align:-2px}
+textarea{resize:vertical;line-height:1.6}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid var(--line2);background:#fff;color:var(--ink);border-radius:var(--r-sm);
+  padding:8.5px 16px;font-size:13.8px;font-weight:500;transition:.15s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--pine);color:var(--pine-d);background:var(--pine-ll)}
+.btn.primary{background:var(--pine);border-color:var(--pine);color:#fff}
+.btn.primary:hover{background:var(--pine-d);color:#fff}
+.btn.danger{color:var(--cinnabar);border-color:#E3B7AB}
+.btn.danger:hover{background:var(--cinnabar-l);color:var(--cinnabar)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#fff}
+.btn.gold:hover{background:#8E6B20;color:#fff}
+.btn.big{padding:14px 30px;font-size:16px;border-radius:var(--r);width:100%;font-weight:700;letter-spacing:2px}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:500}
+.pill.green{background:var(--pine-l);color:var(--pine-d)}
+.pill.red{background:var(--cinnabar-l);color:var(--cinnabar)}
+.pill.gold{background:var(--gold-l);color:var(--gold)}
+.pill.gray{background:#ECEAE0;color:var(--ink2)}
+.pill.blue{background:var(--blue-l);color:var(--blue)}
+.hint{font-size:12.5px;color:var(--ink3);line-height:1.6}
+.hint.warn{color:var(--cinnabar)}
+table.data{width:100%;border-collapse:collapse;font-size:13.3px}
+table.data th{
+  background:var(--paper2);color:var(--ink2);font-weight:500;padding:8px 9px;text-align:left;
+  border-bottom:1.5px solid var(--line2);white-space:nowrap;
+}
+table.data td{padding:6px 9px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.data tr:hover td{background:var(--pine-ll)}
+table.data input,table.data select{padding:5px 8px;font-size:13px}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff}
+.icon-btn{padding:5px 8px;border-radius:6px;color:var(--ink2)}
+.icon-btn:hover{background:var(--paper2);color:var(--cinnabar)}
+.switch{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0}
+.switch input{display:none}
+.switch i{position:absolute;inset:0;background:var(--line2);border-radius:99px;transition:.18s;cursor:pointer}
+.switch i::after{content:'';position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;top:2.5px;left:3px;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch input:checked + i{background:var(--pine)}
+.switch input:checked + i::after{transform:translateX(17px)}
+.opt-line{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.opt-line:last-child{border-bottom:none}
+.opt-line .txt{flex:1}
+.opt-line .txt b{font-weight:500;display:block}
+.opt-line .txt span{font-size:12.5px;color:var(--ink3)}
+.toast-wrap{position:fixed;top:74px;right:22px;z-index:100;display:flex;flex-direction:column;gap:9px}
+.toast{
+  background:#22302B;color:#F6F4EC;padding:11px 17px;border-radius:8px;font-size:13.3px;
+  box-shadow:var(--shadow-lg);animation:toastIn .25s ease;max-width:340px;
+}
+.toast.err{background:#8E3320}
+.toast.ok{background:var(--pine-d)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+.modal-mask{position:fixed;inset:0;background:rgba(23,38,33,.5);z-index:90;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.show{display:flex}
+.modal{background:var(--card);border-radius:12px;max-width:560px;width:100%;max-height:86vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal.wide{max-width:860px}
+.modal .m-head{padding:17px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.modal .m-head h3{flex:1;font-size:16px}
+.modal .m-body{padding:20px 22px}
+.modal .m-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.empty{
+  border:2px dashed var(--line2);border-radius:var(--r);padding:44px 24px;text-align:center;color:var(--ink3);
+  background:rgba(255,255,255,.5);
+}
+.empty svg{margin-bottom:12px;opacity:.5}
+.empty b{display:block;color:var(--ink2);font-size:15.5px;margin-bottom:6px}
+.stat-num{font-size:26px;font-weight:900;color:var(--pine-d);line-height:1.2}
+.stat-lab{font-size:12.5px;color:var(--ink3)}
+.mini-stat{background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 15px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12.3px;margin:2px;background:var(--paper2);border:1px solid var(--line)}
+.chip button{color:var(--ink3);font-size:13px;line-height:1}
+.chip button:hover{color:var(--cinnabar)}
+.bar{height:9px;border-radius:5px;background:var(--paper2);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px;background:var(--pine)}
+.bar i.warn{background:var(--gold)} .bar i.bad{background:var(--cinnabar)}
+.kbd{font-family:monospace;background:var(--paper2);border:1px solid var(--line2);border-radius:4px;padding:0 5px;font-size:12px}
+details.adv{border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;margin-top:12px}
+details.adv summary{padding:10px 14px;cursor:pointer;font-size:13.3px;color:var(--pine-d);font-weight:500;list-style:none}
+details.adv summary::before{content:'▸ '}
+details.adv[open] summary::before{content:'▾ '}
+details.adv .adv-body{padding:0 14px 14px}
+
+/* ============ 儀表板 ============ */
+.hero{
+  background:linear-gradient(120deg,#173F35 0%,#1C6B57 78%);color:#EAF2EE;border-radius:14px;
+  padding:26px 28px;margin-bottom:18px;position:relative;overflow:hidden;
+}
+.hero::after{
+  content:'';position:absolute;right:-40px;top:-60px;width:260px;height:260px;border-radius:50%;
+  border:34px solid rgba(232,180,74,.12);
+}
+.hero h2{font-size:22px;color:#fff;margin-bottom:7px;letter-spacing:1px}
+.hero p{color:#BFD2CA;max-width:640px;font-size:13.6px}
+.hero .hero-actions{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
+.hero .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:#fff}
+.hero .btn:hover{background:rgba(255,255,255,.2);color:#fff}
+.hero .btn.primary{background:var(--gold);border-color:var(--gold);color:#173F35;font-weight:700}
+.hero .btn.primary:hover{background:#c9a245;color:#173F35}
+.step-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.step-card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px;cursor:pointer;
+  transition:.16s;display:flex;gap:13px;align-items:flex-start;box-shadow:var(--shadow);
+}
+.step-card:hover{border-color:var(--pine);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.step-card .n{
+  width:30px;height:30px;border-radius:8px;background:var(--pine-l);color:var(--pine-d);font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;
+}
+.step-card.done .n{background:var(--pine);color:#fff}
+.step-card b{font-size:14.3px;display:block;margin-bottom:2px}
+.step-card p{font-size:12.3px;color:var(--ink3);line-height:1.5}
+.step-card .st{margin-top:7px;font-size:12px}
+
+/* ============ 課表網格 ============ */
+.tt-tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+.tt-tab{padding:9px 16px;font-size:14px;color:var(--ink2);border-bottom:2.5px solid transparent;margin-bottom:-2px;font-weight:500}
+.tt-tab.active{color:var(--pine-d);border-bottom-color:var(--pine)}
+.tt-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.tt-toolbar select{width:auto;min-width:170px}
+.timetable{width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;font-size:12.8px}
+.timetable{min-width:560px}
+.timetable th,.timetable td{border:1px solid var(--line);text-align:center;vertical-align:middle}
+.timetable th{background:var(--paper2);padding:7px 4px;font-weight:500;color:var(--ink2);font-size:12.5px}
+.timetable td{padding:0;height:52px;cursor:default;position:relative;transition:.1s}
+.timetable td[data-slot]{cursor:pointer}
+#ttBody{overflow-x:auto}
+.timetable td .sub{font-weight:700;font-size:12.8px;line-height:1.25}
+.timetable td .tea{font-size:11px;color:var(--ink2);line-height:1.3;margin-top:1px}
+.timetable td.fixed{background:#ECEAE0;cursor:default}
+.timetable td.fixed .sub{color:var(--ink2);font-weight:500}
+.timetable td.break{background:var(--gold-l);cursor:default;height:30px;color:var(--gold);font-weight:500;font-size:12px}
+.timetable td.study{background:#F0EDE2;cursor:default}
+.timetable td.empty-cell{background:repeating-linear-gradient(45deg,#faf8f2,#faf8f2 6px,#f4f1e8 6px,#f4f1e8 12px)}
+.timetable td.unassigned{background:var(--cinnabar-l)}
+.timetable td.pick{outline:3px solid var(--cinnabar);outline-offset:-3px;z-index:2}
+.timetable td:hover:not(.fixed):not(.break):not(.study){box-shadow:inset 0 0 0 2px var(--pine)}
+.timetable .time-col{width:74px;background:var(--paper2);font-size:11.5px;color:var(--ink2)}
+.timetable .time-col b{display:block;font-size:12.5px;color:var(--ink)}
+.legend{display:flex;gap:13px;flex-wrap:wrap;margin:12px 0;font-size:12px;color:var(--ink2)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* ============ 教師可用性 mini grid ============ */
+.mini-grid{display:grid;grid-template-columns:auto repeat(var(--d),1fr);gap:2px;font-size:11px;align-items:center}
+.mini-grid .mg-cell{height:20px;border-radius:3px;background:var(--pine-l);cursor:pointer}
+.mini-grid .mg-cell.off{background:var(--cinnabar-l)}
+.mini-grid .mg-lab{background:transparent;cursor:default;color:var(--ink3);font-size:10.5px;text-align:center;padding:0 2px}
+
+.progress-track{height:12px;background:var(--paper2);border-radius:99px;overflow:hidden;margin:10px 0}
+.progress-track i{display:block;height:100%;background:linear-gradient(90deg,var(--pine),#3E9479);border-radius:99px;transition:width .3s;width:0}
+.log-box{background:#1E2A26;color:#B9CDC4;border-radius:var(--r-sm);padding:14px 16px;font-family:monospace;font-size:12px;line-height:1.8;max-height:230px;overflow-y:auto;white-space:pre-wrap}
+.rule-card{display:flex;gap:12px;align-items:flex-start;padding:13px 15px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;margin-bottom:9px}
+.rule-card .ricon{width:30px;height:30px;border-radius:7px;background:var(--pine-l);color:var(--pine-d);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rule-card b{display:block;font-size:13.7px}
+.rule-card p{font-size:12.3px;color:var(--ink3)}
+.rule-card .switch{margin-top:4px}
+input[type=range]{width:100%;accent-color:var(--pine)}
+
+@media (max-width:980px){
+  .sidebar{transform:translateX(-100%);transition:.25s;box-shadow:var(--shadow-lg)}
+  .sidebar.open{transform:none}
+  .main{margin-left:0}
+  .hamburger{display:inline-flex}
+  .step-grid{grid-template-columns:1fr}
+  .grid2,.grid3,.grid4{grid-template-columns:1fr}
+  .content{padding:18px 14px 50px}
+  .topbar{padding:0 14px}
+}
+@media print{
+  .sidebar,.topbar,.tt-tabs,.tt-toolbar,.page-foot,.no-print,.toast-wrap,.modal-mask{display:none !important}
+  .main{margin:0}
+  body{background:#fff}
+  .content{padding:0;max-width:none}
+  .timetable{min-width:0}
+  #ttBody{overflow:visible}
+  .print-block{page-break-after:always}
+  .print-block h2{font-size:15px;margin:0 0 8px}
+  .card{box-shadow:none;border:none;padding:0;margin:0}
+  #printArea{display:block !important}
+}
+#printArea{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ===== 側邊導覽 ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">
+        <svg width="30" height="30" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1C6B57"/><rect x="7" y="8" width="18" height="17" rx="2" fill="none" stroke="#F6F4EC" stroke-width="2"/><path d="M7 13h18M12 8v-3M20 8v-3" stroke="#F6F4EC" stroke-width="2" stroke-linecap="round"/><path d="M11 18h4M11 21h7" stroke="#E8B44A" stroke-width="2" stroke-linecap="round"/></svg>
+        <div><b>智慧排課系統</b><small>SCHEDULING&nbsp;AI</small></div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      排課引擎全程於本機瀏覽器運算<br>資料不會自動上傳<br><br>
+      <b>林宸嘉製</b>
+    </div>
+  </aside>
+
+  <!-- ===== 主區域 ===== -->
+  <div class="main">
+    <header class="topbar">
+      <button class="btn sm hamburger" id="hamburger">選單</button>
+      <h1 id="pageTitle"></h1>
+      <button class="btn sm" id="btnAiSettings">AI 設定</button>
+      <button class="btn sm" id="btnImport">匯入專案</button>
+      <button class="btn sm primary" id="btnSave">儲存 / 匯出</button>
+    </header>
+    <main class="content" id="content"></main>
+    <footer class="page-foot">智慧排課系統 · 以科學排課演算法減輕教職員負擔 · <b>林宸嘉製</b></footer>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="modal-mask" id="modalMask"><div class="modal" id="modalBox"></div></div>
+<input type="file" id="fileInput" accept=".csv,.json,.txt" style="display:none">
+<div id="printArea"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   一、常數、預設資料
+========================================================= */
+const DAY_NAMES=['週一','週二','週三','週四','週五','週六'];
+const PERIOD_NAMES=['第一節','第二節','第三節','第四節','第五節','第六節','第七節','第八節','第九節','第十節'];
+const HEAVENLY=['甲','乙','丙','丁','戊','己','庚','辛','壬','癸','子','丑'];
+const GRADES=[
+  {id:'J1',name:'國一',level:'國中',code:7},
+  {id:'J2',name:'國二',level:'國中',code:8},
+  {id:'J3',name:'國三',level:'國中',code:9},
+  {id:'S1',name:'高一',level:'高中',code:1},
+  {id:'S2',name:'高二',level:'高中',code:2},
+  {id:'S3',name:'高三',level:'高中',code:3}
+];
+const gradeById=id=>GRADES.find(g=>g.id===id);
+// 科目類別：core 高認知主科 / society 社會科 / skill 技能與一般 / arts 藝能動態 / self 自習
+const CAT_META={
+  core:{name:'高認知主科',color:'#2F6E8C'},
+  society:{name:'社會科',color:'#8C6E3D'},
+  skill:{name:'技能/一般',color:'#5F7480'},
+  arts:{name:'藝能/動態',color:'#B05E34'},
+  self:{name:'自習',color:'#A99F86'}
+};
+const SUBJECT_CATALOG=[
+  {id:'chinese',name:'國文',cat:'core'},
+  {id:'english',name:'英文',cat:'core'},
+  {id:'math',name:'數學',cat:'core'},
+  {id:'nature',name:'自然(理化)',cat:'core',room:'lab'},
+  {id:'bio',name:'生物',cat:'core',room:'lab'},
+  {id:'phys',name:'物理',cat:'core',room:'lab'},
+  {id:'chem',name:'化學',cat:'core',room:'lab'},
+  {id:'earth',name:'地球科學',cat:'core',room:'lab'},
+  {id:'hist',name:'歷史',cat:'society'},
+  {id:'geo',name:'地理',cat:'society'},
+  {id:'civic',name:'公民與社會',cat:'society'},
+  {id:'pe',name:'體育',cat:'arts',room:'gym'},
+  {id:'music',name:'音樂',cat:'arts',room:'music'},
+  {id:'art',name:'美術',cat:'arts',room:'art'},
+  {id:'drama',name:'表演藝術',cat:'arts'},
+  {id:'club',name:'社團',cat:'arts'},
+  {id:'cs',name:'資訊科技',cat:'skill',room:'computer'},
+  {id:'tech',name:'生活科技',cat:'skill',room:'homeec'},
+  {id:'homeec',name:'家政',cat:'skill',room:'homeec'},
+  {id:'scout',name:'童軍',cat:'skill'},
+  {id:'guidance',name:'輔導',cat:'skill'},
+  {id:'career',name:'生涯規劃',cat:'skill'},
+  {id:'defense',name:'全民國防',cat:'skill'},
+  {id:'flex',name:'彈性學習',cat:'skill'},
+  {id:'study',name:'自習',cat:'self'}
+];
+// 每週節數範本（可依各校校況調整）
+const GRADE_TEMPLATES={
+  J1:{chinese:5,english:3,math:4,nature:3,hist:2,geo:2,civic:1,pe:2,music:1,art:1,drama:1,scout:1,homeec:1,guidance:1,cs:1,tech:1,flex:2},
+  J2:{chinese:5,english:3,math:4,nature:4,hist:1,geo:1,civic:2,pe:2,music:1,art:1,drama:1,scout:1,homeec:1,guidance:1,cs:1,tech:1,flex:2},
+  J3:{chinese:5,english:4,math:4,nature:4,hist:2,geo:2,civic:1,pe:2,music:1,art:1,drama:1,scout:1,homeec:1,guidance:1,cs:1,flex:2},
+  S1:{chinese:4,english:4,math:4,phys:2,chem:2,bio:1,earth:1,hist:2,geo:2,civic:1,pe:2,music:1,art:1,cs:1,career:1,defense:1,flex:2},
+  S2:{chinese:4,english:4,math:4,phys:2,chem:2,bio:2,hist:2,geo:1,civic:1,pe:2,music:1,art:1,homeec:1,cs:1,career:1,defense:1,flex:2},
+  S3:{chinese:4,english:4,math:4,phys:2,chem:2,bio:1,earth:1,hist:1,geo:1,civic:2,pe:2,music:1,art:1,flex:3,study:2}
+};
+const ROOM_NAMES={lab:'自然實驗室',music:'音樂教室',art:'美術教室',computer:'電腦教室',gym:'體育館/操場',homeec:'家政/生活科技教室'};
+const SUBJECT_COLORS=['#2F6E8C','#3D7A5A','#A86A2B','#5E8C46','#8C6E3D','#B05E34','#4E8C8C','#B04A6A','#6E7B8C','#7A8C3D','#8C5A4A','#4A6B8C','#9A7B3A','#5A8C6E'];
+
+/* =========================================================
+   二、工具函式
+========================================================= */
+const $=(s,r)=>(r||document).querySelector(s);
+const $all=(s,r)=>[...(r||document).querySelectorAll(s)];
+const uid=p=>p+Math.random().toString(36).slice(2,9);
+const clone=o=>JSON.parse(JSON.stringify(o));
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function toast(msg,type){
+  const t=document.createElement('div');t.className='toast '+(type||'');t.textContent=msg;
+  $('#toastWrap').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),320)},2600);
+}
+function modalOpen(html,wide){
+  $('#modalBox').className='modal'+(wide?' wide':'');
+  $('#modalBox').innerHTML=html;$('#modalMask').classList.add('show');
+}
+function modalClose(){$('#modalMask').classList.remove('show')}
+$('#modalMask').addEventListener('click',e=>{if(e.target.id==='modalMask')modalClose()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')modalClose()});
+function addMin(t,m){const [h,mi]=t.split(':').map(Number);const x=h*60+mi+m;return String(Math.floor(x/60)%24).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
+function fmtHM(t){return t}
+function subjectById(id){return S.subjects.find(x=>x.id===id)||SUBJECT_CATALOG.find(x=>x.id===id)}
+function classById(id){return S.classes.find(c=>c.id===id)}
+function teacherById(id){return S.teachers.find(t=>t.id===id)}
+function subjColor(s){
+  if(!s)return '#CFC9B6';
+  const map={chinese:'#2F6E8C',english:'#3D7A5A',math:'#A86A2B',nature:'#5E8C46',bio:'#5E8C46',phys:'#5E8C46',chem:'#5E8C46',earth:'#5E8C46',hist:'#8C6E3D',geo:'#A3824B',civic:'#B08A52',pe:'#B05E34',music:'#4E8C8C',art:'#B04A6A',drama:'#C07A52',club:'#7A8C3D',cs:'#5F7480',tech:'#6E7B8C',homeec:'#8C5A4A',scout:'#7A8450',guidance:'#6B8C7B',career:'#6B8C7B',defense:'#6E7B8C',flex:'#8A9A7B',study:'#B8B09A'};
+  return map[s.id]||s.color||'#6E7B8C';
+}
+function className(g,idx){
+  const gr=gradeById(g);
+  if(S.nameStyle==='heavenly')return gr.name+HEAVENLY[idx];
+  if(S.nameStyle==='code')return String(gr.code)+String(idx+1).padStart(2,'0');
+  return gr.name+(idx+1)+'班';
+}
+function teacherLoad(tid){
+  const t=teacherById(tid);let h=0;
+  S.groups.forEach(g=>{if(g.teacherId===tid)h+=g.hours});
+  return h;
+}
+function teacherCapacity(t){return (t&&t.maxDaily||S.maxDaily)*S.days}
+
+/* =========================================================
+   三、狀態與持久化
+========================================================= */
+function defaultHours(){
+  const h={};GRADES.forEach(g=>h[g.id]={});
+  Object.entries(GRADE_TEMPLATES).forEach(([gid,row])=>Object.assign(h[gid],row));
+  return h;
+}
+function genTimeline(first,len,brk,lunchMin,morning,afternoon){
+  const periods=[];let cur=first;const total=morning+afternoon;
+  let lunch={start:'11:30',end:addMin('11:30',lunchMin)};
+  for(let i=0;i<total;i++){
+    periods.push({name:PERIOD_NAMES[i]||('第'+(i+1)+'節'),start:cur,end:addMin(cur,len)});
+    cur=addMin(cur,len);
+    if(i===morning-1){lunch={start:cur,end:addMin(cur,lunchMin)};cur=addMin(cur,lunchMin)}
+    else cur=addMin(cur,brk);
+  }
+  return {periods,lunch};
+}
+function defaultState(){
+  const s={
+    v:1,school:'',days:5,morningCount:4,afternoonCount:4,
+    junior:{J1:3,J2:3,J3:2},senior:{S1:2,S2:2,S3:1},
+    nameStyle:'num',
+    flags:{study:true,assembly:true,meeting:true},
+    studyTime:{start:'07:30',end:'07:55'},
+    maxDaily:4,maxConsecutive:4,
+    periods:[],lunch:{start:'11:30',end:'12:00'},
+    classes:[],subjects:clone(SUBJECT_CATALOG),hours:defaultHours(),
+    rooms:{lab:2,music:1,art:1,computer:1,gym:2,homeec:1},
+    teachers:[],groups:[],
+    prior:{enabled:false,weight:25,data:{},source:''},
+    rules:{morningCore:true,afterLunch:true,noRepeat:true,teacherLoad:true,teacherGap:true,friAfternoon:true,monFirst:true,spacing:true,fatigue:true},
+    ai:{base:'https://api.groq.com/openai/v1',key:'',model:'llama-3.3-70b-versatile'},
+    result:null
+  };
+  const tl=genTimeline('08:00',45,10,30,s.morningCount,s.afternoonCount);
+  s.periods=tl.periods;s.lunch=tl.lunch;
+  return s;
+}
+let S=defaultState();
+const LS_KEY='smart_timetable_v1';
+let saveTimer=null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(S))}catch(e){}},350);
+}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);if(!raw)return false;
+    const d=JSON.parse(raw);
+    const def=defaultState();
+    S=Object.assign(def,d);
+    S.flags=Object.assign(def.flags,d.flags||{});
+    S.rules=Object.assign(def.rules,d.rules||{});
+    S.ai=Object.assign(def.ai,d.ai||{});
+    S.prior=Object.assign(def.prior,d.prior||{});
+    S.rooms=Object.assign(def.rooms,d.rooms||{});
+    if(!Array.isArray(S.periods)||!S.periods.length)S.periods=def.periods;
+    return true;
+  }catch(e){console.warn(e);return false}
+}
+
+/* =========================================================
+   四、資料同步：班級、授課群組、教師分發
+========================================================= */
+function expectedCounts(){const o={};GRADES.forEach(g=>o[g.id]=Number(S[g.level==='國中'?'junior':'senior'][g.id])||0);return o}
+function totalClasses(){return Object.values(expectedCounts()).reduce((a,b)=>a+b,0)}
+function syncClasses(){
+  const counts=expectedCounts();
+  for(const g of GRADES){
+    const n=counts[g.id];
+    let exist=S.classes.filter(c=>c.grade===g.id).sort((a,b)=>a.idx-b.idx);
+    if(exist.length<n){
+      for(let i=exist.length;i<n;i++){
+        S.classes.push({id:uid('c'),grade:g.id,idx:i,name:className(g.id,i),homeroom:null});
+      }
+    }else if(exist.length>n){
+      const remove=exist.slice(n);
+      const ids=new Set(remove.map(c=>c.id));
+      S.classes=S.classes.filter(c=>!ids.has(c.id));
+      S.groups=S.groups.filter(gp=>!ids.has(gp.classId));
+      S.teachers.forEach(t=>{if(t.homeroom&&ids.has(t.homeroom))t.homeroom=null});
+    }else{
+      exist.forEach((c,i)=>{if(!c.name)c.name=className(g.id,i)});
+    }
+  }
+  syncGroups();
+}
+function syncGroups(){
+  const old=new Map(S.groups.map(g=>[g.classId+'|'+g.subjectId,g]));
+  const ng=[];
+  S.classes.forEach(c=>{
+    const h=S.hours[c.grade]||{};
+    S.subjects.forEach(s=>{
+      const n=Number(h[s.id])||0;
+      if(n>0){
+        const ex=old.get(c.id+'|'+s.id);
+        ng.push(ex?{id:ex.id,classId:c.id,subjectId:s.id,teacherId:ex.teacherId,hours:n}:{id:uid('g'),classId:c.id,subjectId:s.id,teacherId:null,hours:n});
+      }
+    });
+  });
+  S.groups=ng;
+}
+function autoAssign(){
+  syncGroups();
+  const load={};S.teachers.forEach(t=>load[t.id]=teacherLoad(t.id));
+  // 先清空再重分（保留導師優先）
+  S.groups.forEach(g=>g.teacherId=null);
+  const bySubject={};
+  S.groups.forEach(g=>{(bySubject[g.subjectId]=bySubject[g.subjectId]||[]).push(g)});
+  Object.values(bySubject).forEach(list=>list.sort((a,b)=>a.classId.localeCompare(b.classId)));
+  Object.entries(bySubject).forEach(([sid,list])=>{
+    const cands=S.teachers.filter(t=>t.subs.includes(sid));
+    list.forEach(g=>{
+      if(!cands.length)return;
+      const cls=classById(g.classId);
+      let ranked=cands.map(t=>{
+        let score=load[t.id]||0;
+        const hr=S.teachers.find(x=>x.homeroom===g.classId);
+        if(hr&&hr.id===t.id)score-=6; // 導師任教自己班級優先
+        return {t,score};
+      }).sort((a,b)=>a.score-b.score);
+      const pick=ranked[0].t;
+      g.teacherId=pick.id;load[pick.id]=(load[pick.id]||0)+g.hours;
+    });
+  });
+  save();
+}
+function missingAssignments(){return S.groups.filter(g=>!g.teacherId)}
+function overloadedTeachers(){
+  return S.teachers.map(t=>{
+    const load=teacherLoad(t.id),cap=teacherCapacity(t);
+    return {t,load,cap,over:load>cap};
+  }).filter(x=>x.over);
+}
+
+/* =========================================================
+   五、路由與導覽
+========================================================= */
+const ROUTES=[
+  {id:'dashboard',name:'儀表板',group:''},
+  {id:'basics',name:'基本設定',group:'資料設定',num:1},
+  {id:'periods',name:'節次與時間',group:'資料設定',num:2},
+  {id:'classes',name:'班級名單',group:'資料設定',num:3},
+  {id:'subjects',name:'科目與每週節數',group:'資料設定',num:4},
+  {id:'teachers',name:'教師管理',group:'資料設定',num:5},
+  {id:'assign',name:'授課配置',group:'資料設定',num:6},
+  {id:'prior',name:'舊課表匯入（選用）',group:'資料設定',num:7},
+  {id:'generate',name:'一鍵排課',group:'排課執行',num:8},
+  {id:'result',name:'課表總覽',group:'排課執行',num:9}
+];
+function stepStatus(){
+  syncGroups();
+  const miss=missingAssignments().length;
+  return {
+    basics:totalClasses()>0,
+    periods:S.periods.length>0,
+    classes:S.classes.length===totalClasses()&&totalClasses()>0,
+    subjects:Object.values(S.hours).some(row=>Object.values(row).some(v=>v>0)),
+    teachers:S.teachers.length>0,
+    assign:miss===0&&S.groups.length>0,
+    prior:true,
+    generate:miss===0&&S.groups.length>0,
+    result:!!S.result
+  };
+}
+function renderNav(active){
+  const st=stepStatus();
+  let html='',lastGroup='';
+  ROUTES.forEach(r=>{
+    if(r.group&&r.group!==lastGroup){html+=`<div class="nav-group">${r.group}</div>`;lastGroup=r.group}
+    const done=r.num&&st[r.id]?'done':'';
+    const isActive=r.id===active?'active':'';
+    const num=r.num?`<span class="num"><span>${r.num}</span></span>`:svgIcon('dash',18);
+    html+=`<button class="nav-item ${isActive} ${done}" data-route="${r.id}">${num}<span>${r.name}</span></button>`;
+  });
+  $('#nav').innerHTML=html;
+  $all('#nav .nav-item').forEach(b=>b.onclick=()=>location.hash=b.dataset.route);
+}
+function svgIcon(n,size){
+  const p={
+    dash:'<rect x="4" y="5" width="17" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 9h17M8 3v3M15 3v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    check:'<path d="M5 12l4 4 10-10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    warn:'<path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v5M12 18v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    gear:'<circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+  };
+  return `<svg width="${size||18}" height="${size||18}" viewBox="0 0 24 24">${p[n]||p.dash}</svg>`;
+}
+const TITLES={dashboard:'儀表板',basics:'步驟一 · 基本設定',periods:'步驟二 · 節次與時間',classes:'步驟三 · 班級名單',subjects:'步驟四 · 科目與每週節數',teachers:'步驟五 · 教師管理',assign:'步驟六 · 授課配置',prior:'步驟七 · 舊課表匯入',generate:'步驟八 · 一鍵排課',result:'步驟九 · 課表總覽'};
+function route(){
+  const id=(location.hash||'#dashboard').slice(1);
+  const r=ROUTES.find(x=>x.id===id)||ROUTES[0];
+  renderNav(r.id);
+  $('#pageTitle').textContent=TITLES[r.id]||'智慧排課系統';
+  $('#content').innerHTML=VIEWS[r.id]?VIEWS[r.id]():'<div class="empty">頁面不存在</div>';
+  if(MOUNTS[r.id])MOUNTS[r.id]();
+  window.scrollTo(0,0);
+  $('#sidebar').classList.remove('open');
+}
+window.addEventListener('hashchange',route);
+
+/* =========================================================
+   六、視圖：儀表板
+========================================================= */
+const VIEWS={};const MOUNTS={};
+VIEWS.dashboard=()=>{
+  const st=stepStatus();
+  const cards=[
+    ['basics','基本設定','輸入國、高中各年級班級數與每週上課天數',st.basics],
+    ['periods','節次與時間','設定第一節時間、每節長度、下課與午休',st.periods],
+    ['classes','班級名單','確認或修改每一個班級的名稱與導師',st.classes],
+    ['subjects','科目與每週節數','設定各年級每個科目一週要上幾節',st.subjects],
+    ['teachers','教師管理','建立教師名單、可教科目與不排課時段',st.teachers],
+    ['assign','授課配置','指定每位老師負責哪些班級的哪些科目',st.assign],
+    ['prior','舊課表匯入（選用）','上傳歷年課表，讓 AI 學習慣用安排',true],
+    ['generate','一鍵排課','依科學規則自動編排全校課表',st.result],
+    ['result','課表總覽','檢視、微調、列印並匯出班級與教師課表',st.result]
+  ];
+  const doneN=cards.slice(0,6).filter(c=>c[3]).length;
+  return `
+  <div class="hero">
+    <h2>${S.school?esc(S.school)+' · 智慧排課系統':'智慧排課系統 · 讓全校課表一次排好'}</h2>
+    <p>只要輸入班級數、節次時間、班級名稱、科目節數與教師名單，系統就會依「教師不撞堂、主科排在高效時段、避免師生疲勞」等科學規則，自動產出全校班級、教師與場地課表。</p>
+    <div class="hero-actions">
+      <button class="btn primary" id="goStart">${doneN===0?'開始設定':'繼續設定'}</button>
+      <button class="btn" id="goSample">載入範例資料體驗</button>
+      ${S.result?'<button class="btn" id="goResult">查看已產生課表</button>':''}
+    </div>
+  </div>
+  <div class="grid4" style="margin-bottom:18px">
+    <div class="mini-stat"><div class="stat-num">${totalClasses()}</div><div class="stat-lab">班級總數</div></div>
+    <div class="mini-stat"><div class="stat-num">${S.teachers.length}</div><div class="stat-lab">教師人數</div></div>
+    <div class="mini-stat"><div class="stat-num">${S.groups.reduce((a,g)=>a+g.hours,0)}</div><div class="stat-lab">每週總授課節數</div></div>
+    <div class="mini-stat"><div class="stat-num">${missingAssignments().reduce((a,g)=>a+g.hours,0)}</div><div class="stat-lab">待配置教師節數</div></div>
+  </div>
+  <div class="card">
+    <h2>設定流程</h2>
+    <div class="sub">照著九個步驟完成，綠色圓圈代表該步驟已具備必要資料。</div>
+    <div class="step-grid">
+      ${cards.map((c,i)=>`
+        <div class="step-card ${c[3]?'done':''}" data-go="${c[0]}">
+          <div class="n">${c[3]?svgIcon('check',16):(i+1)}</div>
+          <div><b>${c[1]}</b><p>${c[2]}</p></div>
+        </div>`).join('')}
+    </div>
+  </div>
+  <div class="card">
+    <h2>排課採用的科學原則</h2>
+    <div class="sub">規則可在「一鍵排課」頁面個別開關或調整權重。</div>
+    <div class="grid2">
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>教師零撞堂</b><p>同一時段一位老師只會出現在一個班；專科教室、實驗室也不會超用。</p></div></div>
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>大腦高效時段配主科</b><p>國英數自等高認知科目優先排在上午第一至三節，下午安排藝能與技能科。</p></div></div>
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>避免疲勞學習</b><p>午休後第一節不排主科與體育、同日同科不重複、相鄰兩節不全是高難度科目。</p></div></div>
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>教師不過勞</b><p>每日授課節數有上限、避免連續超過四節，並最小化校內空堂等待。</p></div></div>
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>間隔複習效應</b><p>同一科目在一週內均勻分散，避免同一天塞兩節或一週前段全擠在一起。</p></div></div>
+      <div class="rule-card"><div class="ricon">${svgIcon('check',16)}</div><div><b>週五下午輕負荷</b><p>週五後兩節優先排藝能、社團，降低一週末段的學習疲勞。</p></div></div>
+    </div>
+  </div>`;
+};
+MOUNTS.dashboard=()=>{
+  $('#goStart').onclick=()=>{location.hash=stepStatus().basics?'periods':'basics'};
+  $('#goResult')&&($('#goResult').onclick=()=>location.hash='result');
+  $('#goSample').onclick=()=>{
+    modalOpen(`<div class="m-head"><h3>載入範例資料</h3></div>
+      <div class="m-body">將以一所有國高中部的完全中學範例資料取代目前所有設定（含示範教師名單），目前的資料會被覆蓋。</div>
+      <div class="m-foot"><button class="btn" onclick="modalClose()">取消</button><button class="btn primary" id="okSample">載入範例</button></div>`);
+    $('#okSample').onclick=()=>{loadSample();modalClose();toast('範例資料已載入，可直接前往一鍵排課','ok');route()};
+  };
+  $all('.step-card').forEach(c=>c.onclick=()=>location.hash=c.dataset.go);
+};
+
+/* =========================================================
+   七、視圖：基本設定
+========================================================= */
+VIEWS.basics=()=>{
+  const num=(id,v,min,max)=>`<input type="number" min="${min}" max="${max}" id="${id}" value="${v}" style="width:86px">`;
+  const gradeCount=g=>{
+    const bucket=g.level==='國中'?'junior':'senior';
+    return num('cnt_'+g.id,S[bucket][g.id],0,30);
+  };
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 1</span>學校與年級班級數</h2>
+    <div class="sub">先填學校名稱（列印課表時會顯示），再輸入各年級的班級數，系統會自動建立班級名單。</div>
+    <div class="grid2">
+      <label class="fld"><b>學校名稱（選填）</b><input type="text" id="schoolName" value="${esc(S.school)}" placeholder="例如：市立第一完全中學"></label>
+      <label class="fld"><b>每週上課天數</b>
+        <select id="daysSel"><option value="5" ${S.days===5?'selected':''}>週一至週五（5 天）</option><option value="6" ${S.days===6?'selected':''}>週一至週六（6 天）</option></select>
+      </label>
+    </div>
+    <h3>國中部各班級數</h3>
+    <div class="grid3">
+      ${GRADES.filter(g=>g.level==='國中').map(g=>`<label class="fld"><b>${g.name}</b>${gradeCount(g)}</label>`).join('')}
+    </div>
+    <h3>高中部各班級數</h3>
+    <div class="grid3">
+      ${GRADES.filter(g=>g.level==='高中').map(g=>`<label class="fld"><b>${g.name}</b>${gradeCount(g)}</label>`).join('')}
+    </div>
+    <div id="classPreview" style="margin-top:14px"></div>
+  </div>
+  <div class="card">
+    <h2>班級命名方式</h2>
+    <div class="sub">改名後會自動套用至尚未手動修改過的班級名稱。</div>
+    <label class="fld" style="max-width:340px"><b>命名格式</b>
+      <select id="nameStyle">
+        <option value="num" ${S.nameStyle==='num'?'selected':''}>年級＋數字（國一1班、高一3班）</option>
+        <option value="heavenly" ${S.nameStyle==='heavenly'?'selected':''}>年級＋天干（國一甲、國一乙）</option>
+        <option value="code" ${S.nameStyle==='code'?'selected':''}>入學年代碼（701、801、101）</option>
+      </select>
+    </label>
+  </div>
+  <div class="card">
+    <h2>固定活動與每日結構</h2>
+    <div class="sub">這些時段會自動保留，不安排一般課程。</div>
+    <div class="opt-line"><div class="txt"><b>每日早自習／導師時間</b><span>於每日第一節前顯示，不計入授課節數</span></div>
+      <label class="switch"><input type="checkbox" id="fStudy" ${S.flags.study?'checked':''}><i></i></label></div>
+    <div class="opt-line"><div class="txt"><b>週一升旗／朝會</b><span>佔用週一第一節</span></div>
+      <label class="switch"><input type="checkbox" id="fAssembly" ${S.flags.assembly?'checked':''}><i></i></label></div>
+    <div class="opt-line"><div class="txt"><b>週五班會／週會</b><span>佔用週五最後一節</span></div>
+      <label class="switch"><input type="checkbox" id="fMeeting" ${S.flags.meeting?'checked':''}><i></i></label></div>
+    <div class="grid3" style="margin-top:14px">
+      <label class="fld"><b>早自習時間</b><input type="time" id="studyStart" value="${S.studyTime.start}"></label>
+      <label class="fld"><b>早自習結束</b><input type="time" id="studyEnd" value="${S.studyTime.end}"></label>
+      <label class="fld"><b>教師每日授課上限（節）</b><input type="number" id="maxDaily" min="2" max="10" value="${S.maxDaily}"></label>
+    </div>
+    <div class="btn-row"><button class="btn primary" id="toPeriods">下一步：設定節次時間</button></div>
+  </div>`;
+};
+function renderClassPreview(){
+  const el=$('#classPreview');if(!el)return;
+  el.innerHTML=`<span class="pill green">將建立 ${totalClasses()} 個班級</span> <span class="pill gray">國中 ${Object.values(S.junior).reduce((a,b)=>a+(+b||0),0)} 班</span> <span class="pill gray">高中 ${Object.values(S.senior).reduce((a,b)=>a+(+b||0),0)} 班</span>`;
+}
+MOUNTS.basics=()=>{
+  renderClassPreview();
+  $('#schoolName').oninput=e=>{S.school=e.target.value;save()};
+  $('#daysSel').onchange=e=>{S.days=+e.target.value;save()};
+  $('#nameStyle').onchange=e=>{S.nameStyle=e.target.value;
+    GRADES.forEach(g=>S.classes.filter(c=>c.grade===g.id).sort((a,b)=>a.idx-b.idx).forEach((c,i)=>{if(!c.custom)c.name=className(g.id,i)}));
+    save();toast('命名格式已更新');
+  };
+  $all('[id^=cnt_]').forEach(inp=>inp.onchange=()=>{
+    const gid=inp.id.slice(4),g=gradeById(gid),bucket=g.level==='國中'?'junior':'senior';
+    const old=S[bucket][gid],now=Math.max(0,Math.min(30,+inp.value||0));
+    const doIt=()=>{S[bucket][gid]=now;syncClasses();save();renderClassPreview()};
+    if(now<old){
+      modalOpen(`<div class="m-head"><h3>減少 ${g.name} 班級數</h3></div>
+        <div class="m-body">將從 ${old} 班減為 ${now} 班，多出來班級的授課設定會一併移除，確定執行嗎？</div>
+        <div class="m-foot"><button class="btn" id="cntCancel">取消</button><button class="btn danger" id="cntOk">確定刪除</button></div>`);
+      $('#cntCancel').onclick=()=>{modalClose();inp.value=old};
+      $('#cntOk').onclick=()=>{modalClose();doIt();toast('已更新班級數')};
+    }else{doIt()}
+  });
+  [['fStudy','study'],['fAssembly','assembly'],['fMeeting','meeting']].forEach(([id,k])=>{
+    $('#'+id).onchange=e=>{S.flags[k]=e.target.checked;save()};
+  });
+  $('#studyStart').onchange=e=>{S.studyTime.start=e.target.value;save()};
+  $('#studyEnd').onchange=e=>{S.studyTime.end=e.target.value;save()};
+  $('#maxDaily').onchange=e=>{S.maxDaily=Math.max(2,Math.min(10,+e.target.value||4));save()};
+  $('#toPeriods').onclick=()=>location.hash='periods';
+};
+
+/* =========================================================
+   八、視圖：節次與時間
+========================================================= */
+VIEWS.periods=()=>{
+  const rows=S.periods.map((p,i)=>{
+    let lunchRow='';
+    if(i===S.morningCount-1){
+      lunchRow=`<tr><td class="time-col" style="background:var(--gold-l)"><b>午休</b></td>
+        <td><input type="time" value="${S.lunch.start}" id="lunchStart"></td>
+        <td><input type="time" value="${S.lunch.end}" id="lunchEnd"></td>
+        <td class="hint" style="text-align:left">午休不排課</td></tr>`;
+    }
+    return `<tr>
+      <td class="time-col"><b>${p.name}</b></td>
+      <td><input type="time" value="${p.start}" data-pi="${i}" data-k="start"></td>
+      <td><input type="time" value="${p.end}" data-pi="${i}" data-k="end"></td>
+      <td><button class="icon-btn" data-delp="${i}" title="刪除此節">✕</button></td>
+    </tr>${lunchRow}`;
+  }).join('');
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 2</span>每日節次時間</h2>
+    <div class="sub">只要輸入第一節開始時間與節數長度，就會自動算出整天的時間表；之後仍可逐節微調。</div>
+    <div class="grid4">
+      <label class="fld"><b>第一節開始</b><input type="time" id="tFirst" value="08:00"></label>
+      <label class="fld"><b>每節分鐘</b><input type="number" id="tLen" value="45" min="30" max="60"></label>
+      <label class="fld"><b>下課分鐘</b><input type="number" id="tBrk" value="10" min="5" max="30"></label>
+      <label class="fld"><b>午休分鐘</b><input type="number" id="tLunch" value="30" min="20" max="90"></label>
+    </div>
+    <div class="grid3" style="margin-top:6px">
+      <label class="fld"><b>上午節數</b><input type="number" id="tMorning" value="${S.morningCount}" min="1" max="8"></label>
+      <label class="fld"><b>下午節數</b><input type="number" id="tAfter" value="${S.afternoonCount}" min="0" max="8"></label>
+      <div style="display:flex;align-items:flex-end"><button class="btn primary" id="genTime">自動產生時間表</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>時間表</h2>
+    <div class="table-wrap">
+      <table class="data" style="table-layout:fixed;max-width:680px">
+        <colgroup><col style="width:22%"><col style="width:26%"><col style="width:26%"><col style="width:26%"></colgroup>
+        <thead><tr><th>節次</th><th>開始</th><th>結束</th><th></th></tr></thead>
+        <tbody>${rows}
+        <tr><td colspan="4" style="text-align:center"><button class="btn sm" id="addPeriod">＋ 新增一節</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="hint" style="margin-top:10px">提示：「午休後第一節」是排課演算法的重要保護時段，不會安排主科與體育。</div>
+    <div class="btn-row">
+      <button class="btn" id="backBasics">上一步</button>
+      <button class="btn primary" id="toClasses">下一步：確認班級名單</button>
+    </div>
+  </div>`;
+};
+MOUNTS.periods=()=>{
+  $('#genTime').onclick=()=>{
+    S.morningCount=Math.max(1,Math.min(8,+$('#tMorning').value||4));
+    S.afternoonCount=Math.max(0,Math.min(8,+$('#tAfter').value||4));
+    const tl=genTimeline($('#tFirst').value||'08:00',+$('#tLen').value||45,+$('#tBrk').value||10,+$('#tLunch').value||30,S.morningCount,S.afternoonCount);
+    S.periods=tl.periods;S.lunch=tl.lunch;
+    save();route();toast('時間表已重新產生');
+  };
+  $all('[data-pi]').forEach(inp=>inp.onchange=()=>{
+    const i=+inp.dataset.pi,k=inp.dataset.k;S.periods[i][k]=inp.value;save();
+  });
+  const ls=$('#lunchStart');if(ls)ls.onchange=()=>{S.lunch.start=ls.value;save()};
+  const le=$('#lunchEnd');if(le)le.onchange=()=>{S.lunch.end=le.value;save()};
+  $all('[data-delp]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.delp;
+    if(S.periods.length<=1)return toast('至少需保留一節','err');
+    S.periods.splice(i,1);S.periods.forEach((p,j)=>p.name=PERIOD_NAMES[j]||('第'+(j+1)+'節'));
+    if(i<S.morningCount)S.morningCount=Math.max(1,S.morningCount-1);
+    save();route();
+  });
+  $('#addPeriod').onclick=()=>{
+    const i=S.periods.length;
+    const last=S.periods[i-1];
+    const start=last?addMin(last.end,10):'08:00';
+    S.periods.push({name:PERIOD_NAMES[i]||('第'+(i+1)+'節'),start,end:addMin(start,45)});
+    S.afternoonCount++;save();route();
+  };
+  $('#backBasics').onclick=()=>location.hash='basics';
+  $('#toClasses').onclick=()=>location.hash='classes';
+};
+
+/* =========================================================
+   九、視圖：班級名單
+========================================================= */
+VIEWS.classes=()=>{
+  syncClasses();
+  const blocks=GRADES.map(g=>{
+    const list=S.classes.filter(c=>c.grade===g.id).sort((a,b)=>a.idx-b.idx);
+    if(!(S[g.level==='國中'?'junior':'senior'][g.id]>0))return '';
+    return `<h3>${g.level} · ${g.name}（${list.length} 班）</h3>
+    <div class="table-wrap" style="margin-bottom:8px">
+      <table class="data" style="table-layout:fixed">
+        <colgroup><col style="width:12%"><col style="width:38%"><col style="width:38%"><col style="width:12%"></colgroup>
+        <thead><tr><th>序號</th><th>班級名稱</th><th>導師</th><th></th></tr></thead>
+        <tbody>${list.map((c,i)=>`
+          <tr><td>${i+1}</td>
+          <td><input type="text" value="${esc(c.name)}" data-cname="${c.id}"></td>
+          <td><select data-chr="${c.id}"><option value="">— 尚未指定 —</option>
+            ${S.teachers.map(t=>`<option value="${t.id}" ${c.homeroom===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></td>
+          <td><button class="icon-btn" data-cdel="${c.id}" title="刪除班級">✕</button></td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }).join('');
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 3</span>班級名單</h2>
+    <div class="sub">系統已依班級數建立名稱，可逐班修改；導師可於「教師管理」建立教師後再回頭指定。</div>
+    ${S.classes.length?blocks:'<div class="empty"><b>尚未建立任何班級</b>請先到「基本設定」輸入各年級班級數。<div class="btn-row" style="justify-content:center"><button class="btn primary" id="goBasics2">前往基本設定</button></div></div>'}
+    <div class="btn-row">
+      <button class="btn" id="backPeriods">上一步</button>
+      <button class="btn primary" id="toSubjects">下一步：設定科目與節數</button>
+    </div>
+  </div>`;
+};
+MOUNTS.classes=()=>{
+  $all('[data-cname]').forEach(inp=>inp.onchange=()=>{
+    const c=classById(inp.dataset.cname);c.name=inp.value.trim()||c.name;c.custom=true;save();
+  });
+  $all('[data-chr]').forEach(sel=>sel.onchange=()=>{
+    const c=classById(sel.dataset.chr);
+    S.teachers.forEach(t=>{if(t.homeroom===c.id)t.homeroom=null});
+    c.homeroom=sel.value||null;
+    if(sel.value){const t=teacherById(sel.value);t.homeroom=c.id}
+    save();
+  });
+  $all('[data-cdel]').forEach(b=>b.onclick=()=>{
+    const c=classById(b.dataset.cdel);if(!c)return;
+    const g=gradeById(c.grade),bucket=g.level==='國中'?'junior':'senior';
+    S[bucket][g.id]--;syncClasses();save();route();
+  });
+  const gb=$('#goBasics2');if(gb)gb.onclick=()=>location.hash='basics';
+  $('#backPeriods').onclick=()=>location.hash='periods';
+  $('#toSubjects').onclick=()=>location.hash='subjects';
+};
+
+/* =========================================================
+   十、視圖：科目與每週節數
+========================================================= */
+VIEWS.subjects=()=>{
+  const cats=['core','society','skill','arts','self'];
+  const usedGrades=GRADES.filter(g=>S[g.level==='國中'?'junior':'senior'][g.id]>0);
+  const matrix=cats.map(cat=>{
+    const subs=S.subjects.filter(s=>s.cat===cat);
+    const rows=subs.map(s=>{
+      const cells=GRADES.map(g=>{
+        const active=S[g.level==='國中'?'junior':'senior'][g.id]>0;
+        return `<td style="width:${active?10:0}%;${active?'':'display:none'}">
+          <input type="number" min="0" max="10" value="${S.hours[g.id][s.id]||0}" data-mh="${s.id}|${g.id}" style="width:64px"></td>`;
+      }).join('');
+      return `<tr><td style="text-align:left"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${subjColor(s)};margin-right:7px"></span>${s.name}${s.room?` <span class="hint">(${ROOM_NAMES[s.room]})</span>`:''}</td>${cells}<td><button class="icon-btn" data-delsubj="${s.id}" title="刪除自訂科目">${s.custom?'✕':''}</button></td></tr>`;
+    }).join('');
+    const heads=GRADES.map(g=>{
+      const active=S[g.level==='國中'?'junior':'senior'][g.id]>0;
+      return `<th style="${active?'':'display:none'}">${g.name}</th>`;
+    }).join('');
+    return `<tr><th colspan="${GRADES.length+2}" style="background:var(--pine-l);color:var(--pine-d)">${CAT_META[cat].name}</th></tr>
+      <tr><th style="text-align:left">科目</th>${heads}<th></th></tr>${rows}`;
+  }).join('');
+  const totals=GRADES.map(g=>{
+    const sum=Object.values(S.hours[g.id]).reduce((a,b)=>a+(+b||0),0);
+    const cap=S.periods.length*S.days;
+    const cls=sum>cap?'red':sum>cap-2?'gold':'green';
+    return `<td style="${S[g.level==='國中'?'junior':'senior'][g.id]>0?'':'display:none'}"><span class="pill ${cls}">${sum} 節${cap?' / 上限 '+cap:''}</span></td>`;
+  }).join('');
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 4</span>各年級每週節數</h2>
+    <div class="sub">輸入每個年級、每個科目一週要上的節數。已內建符合臺灣學制的範本，可直接修改。</div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn sm" id="tplJunior">套用國中範本</button>
+      <button class="btn sm" id="tplSenior">套用高中範本</button>
+      <button class="btn sm danger" id="tplClear">全部清空</button>
+    </div>
+    <div class="table-wrap" style="margin-top:12px">
+      <table class="data" style="table-layout:fixed">
+        <colgroup><col style="width:24%">${GRADES.map(g=>'<col style="width:10%">').join('')}<col style="width:6%"></colgroup>
+        <tbody>${matrix}</tbody>
+      </table>
+    </div>
+    <div class="table-wrap" style="margin-top:0;border-top:none">
+      <table class="data" style="table-layout:fixed">
+        <tr><td style="text-align:left;font-weight:500;background:var(--paper2)">每週合計</td>${totals}<td></td></tr>
+      </table>
+    </div>
+    <div class="hint" style="margin-top:8px">合計若超過可排節數（每日節數 × 天數，扣除升旗與班會）會標紅，請適度刪減或增加每日節數。</div>
+  </div>
+  <div class="card">
+    <h2>新增自訂科目</h2>
+    <div class="grid4">
+      <label class="fld"><b>科目名稱</b><input type="text" id="newSubjName" placeholder="例如：鄉土語言"></label>
+      <label class="fld"><b>科目類型</b><select id="newSubjCat">${Object.entries(CAT_META).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')}</select></label>
+      <label class="fld"><b>使用專科教室（選填）</b><select id="newSubjRoom"><option value="">一般教室</option>${Object.entries(ROOM_NAMES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+      <div style="display:flex;align-items:flex-end"><button class="btn primary" id="addSubj">新增科目</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>專科教室數量</h2>
+    <div class="sub">同類教室的數量上限，排課時不會讓超過數量的班級同時使用該場地。</div>
+    <div class="grid4">
+      ${Object.entries(ROOM_NAMES).map(([k,v])=>`<label class="fld"><b>${v}</b><input type="number" min="0" max="20" value="${S.rooms[k]??1}" data-room="${k}"></label>`).join('')}
+    </div>
+    <div class="btn-row"><button class="btn" id="backClasses">上一步</button><button class="btn primary" id="toTeachers">下一步：教師管理</button></div>
+  </div>`;
+};
+MOUNTS.subjects=()=>{
+  $all('[data-mh]').forEach(inp=>inp.onchange=()=>{
+    const [sid,gid]=inp.dataset.mh.split('|');
+    S.hours[gid][sid]=Math.max(0,Math.min(10,+inp.value||0));
+    syncGroups();save();route();
+  });
+  $('#tplJunior').onclick=()=>{['J1','J2','J3'].forEach(g=>Object.assign(S.hours[g],GRADE_TEMPLATES[g]));syncGroups();save();route();toast('已套用國中範本')};
+  $('#tplSenior').onclick=()=>{['S1','S2','S3'].forEach(g=>Object.assign(S.hours[g],GRADE_TEMPLATES[g]));syncGroups();save();route();toast('已套用高中範本')};
+  $('#tplClear').onclick=()=>{GRADES.forEach(g=>Object.keys(S.hours[g.id]).forEach(k=>S.hours[g.id][k]=0));syncGroups();save();route()};
+  $('#addSubj').onclick=()=>{
+    const name=$('#newSubjName').value.trim();if(!name)return toast('請輸入科目名稱','err');
+    if(S.subjects.some(s=>s.name===name))return toast('已有同名科目','err');
+    const cat=$('#newSubjCat').value,room=$('#newSubjRoom').value||null;
+    const id='custom_'+uid('s');
+    const color=SUBJECT_COLORS[S.subjects.length%SUBJECT_COLORS.length];
+    S.subjects.push({id,name,cat,room,custom:true,color});
+    GRADES.forEach(g=>S.hours[g.id][id]=0);
+    syncGroups();save();route();toast('已新增科目 '+name);
+  };
+  $all('[data-delsubj]').forEach(b=>b.onclick=()=>{
+    const sid=b.dataset.delsubj;
+    S.subjects=S.subjects.filter(s=>s.id!==sid);
+    S.groups=S.groups.filter(g=>g.subjectId!==sid);
+    S.teachers.forEach(t=>t.subs=t.subs.filter(x=>x!==sid));
+    GRADES.forEach(g=>delete S.hours[g.id][sid]);
+    save();route();
+  });
+  $all('[data-room]').forEach(inp=>inp.onchange=()=>{S.rooms[inp.dataset.room]=Math.max(0,+inp.value||0);save()});
+  $('#backClasses').onclick=()=>location.hash='classes';
+  $('#toTeachers').onclick=()=>location.hash='teachers';
+};
+
+/* =========================================================
+   十一、視圖：教師管理
+========================================================= */
+VIEWS.teachers=()=>{
+  syncGroups();
+  const need={};
+  S.groups.forEach(g=>{need[g.subjectId]=(need[g.subjectId]||0)+g.hours});
+  const covered={};
+  S.teachers.forEach(t=>t.subs.forEach(s=>covered[s]=true));
+  const lacking=Object.entries(need).filter(([s,h])=>!covered[s]);
+  const rows=S.teachers.map(t=>{
+    const load=teacherLoad(t.id),cap=teacherCapacity(t);
+    const hrClass=t.homeroom?classById(t.homeroom):null;
+    const chips=t.subs.map(sid=>{
+      const s=subjectById(sid);
+      return `<span class="chip" style="border-color:${subjColor(s)}55">${s?s.name:'?'} <button data-rmsub="${t.id}|${sid}">✕</button></span>`;
+    }).join('');
+    const addable=S.subjects.filter(s=>!t.subs.includes(s.id)).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+    return `<tr>
+      <td><input type="text" value="${esc(t.name)}" data-tname="${t.id}" style="min-width:90px"></td>
+      <td style="text-align:left">${chips}<select data-addsub="${t.id}" style="width:auto;display:inline-block;min-width:70px;margin-left:4px"><option value="">＋科目</option>${addable}</select></td>
+      <td><input type="number" min="1" max="10" value="${t.maxDaily||S.maxDaily}" data-tmax="${t.id}" style="width:64px" title="每日授課上限"></td>
+      <td>${hrClass?esc(hrClass.name):'<span class="hint">—</span>'}<br><span class="pill ${load>cap?'red':'gray'}">${load}/${cap} 節</span></td>
+      <td><button class="btn sm" data-unavail="${t.id}">不排課時段${t.unavail&&t.unavail.length?`（${t.unavail.length}）`:''}</button></td>
+      <td><button class="icon-btn" data-delt="${t.id}">✕</button></td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 5</span>教師名單</h2>
+    <div class="sub">建立教師、勾選可教科目，並設定導師班、每日授課上限與個人不排課時段（如進修、兼行政）。</div>
+    <div class="grid3" style="align-items:end">
+      <label class="fld"><b>教師姓名</b><input type="text" id="tName" placeholder="例如：王大明"></label>
+      <label class="fld"><b>主要可教科目</b><select id="tSub"><option value="">— 請選擇 —</option>${S.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></label>
+      <div><button class="btn primary" id="addTeacher">新增教師</button>
+        <button class="btn" id="autoTeacher">依課程自動補足教師</button></div>
+    </div>
+    ${lacking.length?`<div class="hint warn" style="margin-top:10px">下列科目尚無任何可任教教師：${lacking.map(([s])=>subjectById(s).name).join('、')}，可點「依課程自動補足教師」快速建立。</div>`:''}
+    <div class="table-wrap" style="margin-top:14px">
+      <table class="data" style="table-layout:fixed">
+        <colgroup><col style="width:13%"><col style="width:34%"><col style="width:10%"><col style="width:15%"><col style="width:16%"><col style="width:6%"></colgroup>
+        <thead><tr><th>姓名</th><th>可教科目</th><th>每日上限</th><th>導師班／負荷</th><th>限制時段</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:24px">尚未新增教師</td></tr>'}</tbody>
+      </table>
+    </div>
+    <details class="adv">
+      <summary>大量新增教師（貼上名單）</summary>
+      <div class="adv-body">
+        <label class="fld"><b>每行一位教師姓名，並指定共同科目</b>
+          <select id="bulkSub" style="margin-bottom:6px">${S.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+          <textarea id="bulkNames" rows="4" placeholder="林老師&#10;陳老師&#10;李老師"></textarea></label>
+        <button class="btn sm primary" id="bulkAdd">批量新增</button>
+      </div>
+    </details>
+    <div class="btn-row"><button class="btn" id="backSubjects">上一步</button><button class="btn primary" id="toAssign">下一步：授課配置</button></div>
+  </div>`;
+};
+function openUnavail(tid){
+  const t=teacherById(tid);if(!t)return;
+  const M=S.periods.length,D=S.days;
+  const off=new Set(t.unavail||[]);
+  let head='<div class="mg-lab"></div>'+DAY_NAMES.slice(0,D).map(d=>`<div class="mg-lab">${d}</div>`).join('');
+  let body='';
+  for(let p=0;p<M;p++){
+    body+=`<div class="mg-lab">${S.periods[p].name.replace('第','').replace('節','')}</div>`;
+    for(let d=0;d<D;d++){
+      const k=d+'-'+p;
+      body+=`<div class="mg-cell ${off.has(k)?'off':''}" data-u="${k}"></div>`;
+    }
+  }
+  modalOpen(`<div class="m-head"><h3>${esc(t.name)}老師 · 不排課時段</h3></div>
+    <div class="m-body">
+      <div class="hint" style="margin-bottom:10px">點選時段切換：米色代表可排課，紅色代表該時段不安排此教師授課。</div>
+      <div class="mini-grid" style="--d:${D}">${head}${body}</div>
+    </div>
+    <div class="m-foot"><button class="btn primary" id="unavailOk">完成</button></div>`);
+  $all('[data-u]').forEach(c=>c.onclick=()=>{
+    const k=c.dataset.u;
+    if(off.has(k)){off.delete(k);c.classList.remove('off')}else{off.add(k);c.classList.add('off')}
+  });
+  $('#unavailOk').onclick=()=>{t.unavail=[...off];save();modalClose();route();toast('已儲存不排課時段')};
+}
+MOUNTS.teachers=()=>{
+  $('#addTeacher').onclick=()=>{
+    const name=$('#tName').value.trim();if(!name)return toast('請輸入教師姓名','err');
+    const sub=$('#tSub').value;
+    const t={id:uid('t'),name,subs:sub?[sub]:[],maxDaily:S.maxDaily,homeroom:null,unavail:[]};
+    S.teachers.push(t);
+    const cls=S.classes.find(c=>!c.homeroom&&sub==='chinese');
+    if(cls){t.homeroom=cls.id;cls.homeroom=t.id}
+    save();route();toast('已新增教師 '+name);
+  };
+  $('#autoTeacher').onclick=()=>{
+    syncGroups();
+    const total={};S.groups.forEach(g=>total[g.subjectId]=(total[g.subjectId]||0)+g.hours);
+    const letters='ABCDEFGHIJKLMN';
+    let created=0;
+    Object.entries(total).forEach(([sid,h])=>{
+      const cands=S.teachers.filter(t=>t.subs.includes(sid));
+      const cap=S.maxDaily*S.days*0.85; // 保留 15% 餘裕，避免教師滿載導致排課僵化
+      const existCap=cands.reduce((a,t)=>a+((t.maxDaily||S.maxDaily)*S.days),0);
+      let n=Math.max(0,Math.ceil((h-existCap)/cap));
+      for(let i=0;i<n;i++){
+        const s=subjectById(sid);
+        S.teachers.push({id:uid('t'),name:s.name+'教師'+letters[cands.length+i],subs:[sid],maxDaily:S.maxDaily,homeroom:null,unavail:[]});
+        created++;
+      }
+    });
+    save();route();toast(created?`已自動建立 ${created} 位教師`:'教師數量已足夠，無需補足');
+  };
+  $all('[data-tname]').forEach(inp=>inp.onchange=()=>{const t=teacherById(inp.dataset.tname);t.name=inp.value.trim()||t.name;save()});
+  $all('[data-tmax]').forEach(inp=>inp.onchange=()=>{const t=teacherById(inp.dataset.tmax);t.maxDaily=Math.max(1,Math.min(10,+inp.value||S.maxDaily));save();route()});
+  $all('[data-addsub]').forEach(sel=>sel.onchange=()=>{
+    if(!sel.value)return;
+    const t=teacherById(sel.dataset.addsub);if(!t.subs.includes(sel.value))t.subs.push(sel.value);
+    save();route();
+  });
+  $all('[data-rmsub]').forEach(b=>b.onclick=()=>{
+    const [tid,sid]=b.dataset.rmsub.split('|');
+    const t=teacherById(tid);t.subs=t.subs.filter(x=>x!==sid);
+    S.groups.forEach(g=>{if(g.teacherId===tid&&g.subjectId===sid)g.teacherId=null});
+    save();route();
+  });
+  $all('[data-delt]').forEach(b=>b.onclick=()=>{
+    const tid=b.dataset.delt;
+    S.teachers=S.teachers.filter(t=>t.id!==tid);
+    S.groups.forEach(g=>{if(g.teacherId===tid)g.teacherId=null});
+    S.classes.forEach(c=>{if(c.homeroom===tid)c.homeroom=null});
+    save();route();
+  });
+  $all('[data-unavail]').forEach(b=>b.onclick=()=>openUnavail(b.dataset.unavail));
+  $('#bulkAdd').onclick=()=>{
+    const sid=$('#bulkSub').value;
+    const names=$('#bulkNames').value.split('\n').map(x=>x.trim()).filter(Boolean);
+    names.forEach(name=>S.teachers.push({id:uid('t'),name,subs:[sid],maxDaily:S.maxDaily,homeroom:null,unavail:[]}));
+    save();route();toast(`已新增 ${names.length} 位教師`);
+  };
+  $('#backSubjects').onclick=()=>location.hash='subjects';
+  $('#toAssign').onclick=()=>location.hash='assign';
+};
+
+/* =========================================================
+   十二、視圖：授課配置
+========================================================= */
+VIEWS.assign=()=>{
+  syncGroups();
+  const miss=missingAssignments();
+  const over=overloadedTeachers();
+  const blocks=GRADES.map(g=>{
+    const classes=S.classes.filter(c=>c.grade===g.id).sort((a,b)=>a.idx-b.idx);
+    if(!classes.length)return '';
+    const tables=classes.map(c=>{
+      const groups=S.groups.filter(x=>x.classId===c.id);
+      const rows=groups.map(gp=>{
+        const s=subjectById(gp.subjectId);
+        const cands=S.teachers.filter(t=>t.subs.includes(gp.subjectId));
+        const opts=`<option value="">— 待配置 —</option>`+cands.map(t=>`<option value="${t.id}" ${gp.teacherId===t.id?'selected':''}>${esc(t.name)}（${teacherLoad(t.id)}節）</option>`).join('');
+        return `<tr class="${!gp.teacherId?'':''}">
+          <td style="text-align:left"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${subjColor(s)};margin-right:7px"></span>${s.name}</td>
+          <td>${gp.hours}</td>
+          <td><select data-assign="${gp.id}" style="${!gp.teacherId?'border-color:var(--cinnabar)':''}">${opts}</select>
+            ${!gp.teacherId?'<span class="pill red" style="margin-left:6px">缺教師</span>':''}</td></tr>`;
+      }).join('');
+      return `<div style="margin-bottom:16px">
+        <h3 style="margin-bottom:6px">${esc(c.name)} ${c.homeroom?`<span class="pill green">導師：${esc(teacherById(c.homeroom).name)}</span>`:''}</h3>
+        <div class="table-wrap"><table class="data" style="table-layout:fixed;max-width:560px">
+          <colgroup><col style="width:46%"><col style="width:18%"><col style="width:36%"></colgroup>
+          <thead><tr><th style="text-align:left">科目</th><th>每週節數</th><th>授課教師</th></tr></thead>
+          <tbody>${rows}</tbody></table></div></div>`;
+    }).join('');
+    return `<h2 style="font-size:15px;color:var(--pine-d);margin:18px 0 8px">${g.level} · ${g.name}</h2>${tables}`;
+  }).join('');
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 6</span>授課配置</h2>
+    <div class="sub">指定每個班的每個科目由哪位教師任教；也可一鍵依負荷平衡自動分配。括號中為該教師目前每週總節數。</div>
+    <div class="btn-row" style="margin:0 0 12px">
+      <button class="btn primary" id="doAutoAssign">一鍵自動分配（平衡負荷＋導師優先）</button>
+      ${miss.length?`<span class="pill red">尚有 ${miss.length} 個科目待配置教師</span>`:'<span class="pill green">所有科目皆已配置教師</span>'}
+      ${over.length?`<span class="pill red">${over.length} 位教師超出負荷</span>`:''}
+    </div>
+    ${over.length?`<div class="hint warn" style="margin-bottom:10px">超負荷：${over.map(o=>`${o.t.name}（${o.load}/${o.cap}節）`).join('、')}，請增加可任教該科的教師或調高每日上限。</div>`:''}
+    ${S.classes.length?blocks:'<div class="empty"><b>尚未建立班級</b>請先完成前面步驟。</div>'}
+    <div class="btn-row"><button class="btn" id="backTeachers">上一步</button>
+      <button class="btn" id="toPrior">下一步：匯入舊課表（選用）</button>
+      <button class="btn primary" id="toGenerate2">前往一鍵排課</button></div>
+  </div>`;
+};
+MOUNTS.assign=()=>{
+  $('#doAutoAssign').onclick=()=>{
+    if(!S.teachers.length)return toast('請先新增教師','err');
+    autoAssign();route();toast('已依負荷平衡完成自動分配','ok');
+  };
+  $all('[data-assign]').forEach(sel=>sel.onchange=()=>{
+    const gp=S.groups.find(x=>x.id===sel.dataset.assign);
+    gp.teacherId=sel.value||null;save();route();
+  });
+  $('#backTeachers').onclick=()=>location.hash='teachers';
+  $('#toPrior').onclick=()=>location.hash='prior';
+  $('#toGenerate2').onclick=()=>location.hash='generate';
+};
+
+/* =========================================================
+   十三、AI 用戶端（Groq / OpenAI 相容 API，選用）
+========================================================= */
+async function aiChat(prompt,{json=true,temperature=.2}={}){
+  const {base,key,model}=S.ai;
+  if(!key)throw new Error('no-key');
+  const t0=Date.now();
+  const res=await fetch(base.replace(/\/+$/,'')+'/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature,
+      ...(json?{response_format:{type:'json_object'}}:{})})
+  });
+  if(!res.ok){
+    const tx=await res.text().catch(()=>'');
+    throw new Error('API 回應錯誤 '+res.status+'：'+tx.slice(0,180));
+  }
+  const d=await res.json();
+  return d.choices?.[0]?.message?.content??'';
+}
+function aiSettingsModal(){
+  modalOpen(`<div class="m-head"><h3>AI 設定（選用）</h3></div>
+  <div class="m-body">
+    <div class="hint" style="margin-bottom:14px">本系統的排課引擎在本機瀏覽器運算，<b>不需要 AI 也能完整使用</b>。AI 僅用於：① 以自然語言快速建立設定；② 辨識格式自由的舊課表；③ 產出課表健診建議。推薦使用 Groq 免費 API（註冊後於 console.groq.com/keys 取得 Key）。</div>
+    <label class="fld"><b>API 相容位址（Base URL）</b><input type="text" id="aiBase" value="${esc(S.ai.base)}"></label>
+    <label class="fld"><b>模型名稱</b><input type="text" id="aiModel" value="${esc(S.ai.model)}"></label>
+    <label class="fld"><b>API Key</b><input type="password" id="aiKey" value="${esc(S.ai.key)}" placeholder="gsk_...（只會儲存在你自己的瀏覽器）"></label>
+    <div class="hint">也可填入任何 OpenAI 相容的免費端點，例如 OpenRouter（https://openrouter.ai/api/v1）。</div>
+    <div id="aiTestResult" style="margin-top:8px"></div>
+  </div>
+  <div class="m-foot">
+    <a class="btn" href="https://console.groq.com/keys" target="_blank" rel="noopener">取得免費 Key</a>
+    <button class="btn" id="aiTest">測試連線</button>
+    <button class="btn primary" id="aiSave">儲存</button>
+  </div>`);
+  $('#aiSave').onclick=()=>{
+    S.ai.base=$('#aiBase').value.trim()||S.ai.base;
+    S.ai.model=$('#aiModel').value.trim()||S.ai.model;
+    S.ai.key=$('#aiKey').value.trim();
+    save();modalClose();toast('AI 設定已儲存於本機瀏覽器');
+  };
+  $('#aiTest').onclick=async()=>{
+    S.ai.base=$('#aiBase').value.trim();S.ai.model=$('#aiModel').value.trim();S.ai.key=$('#aiKey').value.trim();
+    const r=$('#aiTestResult');r.innerHTML='<span class="pill gray">連線測試中…</span>';
+    try{
+      const out=await aiChat('只回傳 JSON：{"ok":true}',{temperature:0});
+      JSON.parse(out);
+      r.innerHTML='<span class="pill green">連線成功，模型可正常使用</span>';
+    }catch(e){
+      r.innerHTML=`<span class="pill red">${esc(e.message)}</span>`;
+    }
+  };
+}
+$('#btnAiSettings').onclick=aiSettingsModal;
+
+/* =========================================================
+   十四、舊課表解析（規律 CSV 與 AI 解析共用學習邏輯）
+========================================================= */
+const SUBJ_ALIAS={'理化':'nature','自然':'nature','生物':'bio','物理':'phys','化學':'chem','地科':'earth','地球科學':'earth',
+  '英語':'english','國語':'chinese','公民':'civic','公民與社會':'civic','社會':'hist','電腦':'cs','資訊':'cs','資訊科技':'cs',
+  '生活科技':'tech','生科':'tech','國防':'defense','表演':'drama','表演藝術':'drama','體育':'pe','美術':'art','音樂':'music',
+  '童軍':'scout','家政':'homeec','輔導':'guidance','生涯':'career','生涯規劃':'career','彈性':'flex','社團':'club','自習':'study'};
+const FIXED_WORDS=['升旗','朝會','午休','午餐','早自習','自習時間','班會','週會','導師時間','放學','午休時間','清掃','打掃'];
+function matchSubjectName(name){
+  name=name.trim();
+  let s=S.subjects.find(x=>x.name===name);
+  if(s)return s.id;
+  if(SUBJ_ALIAS[name])return SUBJ_ALIAS[name];
+  const a=Object.entries(SUBJ_ALIAS).find(([k])=>name.includes(k));
+  if(a)return a[1];
+  s=S.subjects.find(x=>name.includes(x.name)||x.name.includes(name));
+  return s?s.id:null;
+}
+function matchClassName(name){
+  name=name.replace(/班級|班表|課表/g,'').trim();
+  return S.classes.find(c=>c.name===name)||S.classes.find(c=>c.name.includes(name)||name.includes(c.name))||null;
+}
+function splitCSVLine(line){
+  const out=[];let cur='',q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q}
+    else if((ch===','||ch==='\t'||ch==='，')&&!q){out.push(cur);cur=''}
+    else cur+=ch;
+  }
+  out.push(cur);return out.map(x=>x.trim());
+}
+function parseCell(raw){
+  if(!raw)return null;
+  raw=raw.trim();
+  if(FIXED_WORDS.some(w=>raw.includes(w)))return {fixed:true};
+  let teacher='';
+  const m=raw.match(/[（(]([^）)]+)[）)]/);
+  if(m){teacher=m[1].trim();raw=raw.replace(m[0],'').trim()}
+  raw=raw.replace(/\s+/g,' ');
+  const parts=raw.split(' ').filter(Boolean);
+  let subjName=parts[0];
+  if(!teacher&&parts.length>1)teacher=parts.slice(1).join(' ');
+  const sid=matchSubjectName(subjName);
+  return {sid,subjName,teacher:teacher.trim(),fixed:false};
+}
+function parseCSVtoBlocks(text){
+  const lines=text.replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(l=>l.length);
+  const blocks=[];let cur=null;
+  for(const line of lines){
+    const cells=splitCSVLine(line);
+    const head=cells[0]||'';
+    if(head.includes('班級')||(head.includes('班')&&!head.includes('節')&&!head.match(/^\d/))){
+      if(cur)blocks.push(cur);
+      cur={className:head.replace('班級','').trim()||('未命名班級'+blocks.length),rows:[]};
+      continue;
+    }
+    if(!cur)cur={className:'未命名班級'+blocks.length,rows:[]};
+    let pIdx=PERIOD_NAMES.findIndex(n=>head.includes(n));
+    if(pIdx<0){const tm=head.match(/(\d{1,2})[:：](\d{2})/);if(tm){const t=tm[1].padStart(2,'0')+':'+tm[2];pIdx=S.periods.findIndex(pp=>pp.start===t)}}
+    if(pIdx<0)pIdx=cur.rows.length;
+    const dayCells=cells.slice(1,1+S.days).map(parseCell);
+    cur.rows.push({p:Math.min(pIdx,S.periods.length-1),cells:dayCells});
+  }
+  if(cur)blocks.push(cur);
+  return blocks;
+}
+function learnFromBlocks(blocks){
+  const r={foundClasses:[],missingClasses:[],newTeachers:[],data:{},unknownSubjects:new Set(),assignments:{}};
+  const teacherMap=new Map(S.teachers.map(t=>[t.name,t]));
+  blocks.forEach(b=>{
+    const cls=matchClassName(b.className);
+    if(!cls){r.missingClasses.push(b.className);return}
+    if(!r.data[cls.id])r.data[cls.id]={};
+    r.foundClasses.push(cls.name);
+    b.rows.forEach(row=>{
+      row.cells.forEach((cell,d)=>{
+        if(!cell||cell.fixed||!cell.sid){
+          if(cell&&!cell.fixed&&cell.subjName)r.unknownSubjects.add(cell.subjName);
+          return;
+        }
+        const slot=d+'-'+row.p;
+        (r.data[cls.id][cell.sid]=r.data[cls.id][cell.sid]||[]).push(slot);
+        if(cell.teacher){
+          let t=teacherMap.get(cell.teacher);
+          if(!t){
+            t={id:uid('t'),name:cell.teacher,subs:[cell.sid],maxDaily:S.maxDaily,homeroom:null,unavail:[]};
+            teacherMap.set(cell.teacher,t);r.newTeachers.push(t);
+          }else if(!t.subs.includes(cell.sid))t.subs.push(cell.sid);
+          r.assignments[cls.id+'|'+cell.sid]=t.id;
+        }
+      });
+    });
+  });
+  r.unknownSubjects=[...r.unknownSubjects];
+  return r;
+}
+let _learned=null;
+function applyLearned(){
+  if(!_learned)return;
+  _learned.newTeachers.forEach(t=>S.teachers.push(t));
+  Object.entries(_learned.assignments).forEach(([k,tid])=>{
+    const [cid,sid]=k.split('|');
+    const gp=S.groups.find(g=>g.classId===cid&&g.subjectId===sid);
+    if(gp)gp.teacherId=tid;
+  });
+  S.prior.data=_learned.data;S.prior.enabled=true;S.prior.source='舊課表';
+  syncGroups();save();
+}
+
+/* =========================================================
+   十五、視圖：舊課表匯入
+========================================================= */
+VIEWS.prior=()=>{
+  const learnedCount=Object.values(S.prior.data).reduce((a,o)=>a+Object.keys(o).length,0);
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 7</span>匯入舊課表（選用）</h2>
+    <div class="sub">提供過去的課表，系統會學習兩件事：① 各科目習慣排在哪些時段（排課時給予加權）；② 各班科目的授課教師。沒有舊課表可直接跳過。</div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn" id="pickCsv">選擇 CSV／TXT 檔案</button>
+      <span class="hint">支援 UTF-8 編碼的 .csv 或 .txt，內容格式如下</span>
+    </div>
+    <details class="adv">
+      <summary>查看舊課表格式範例</summary>
+      <div class="adv-body"><pre style="background:var(--paper2);padding:12px;border-radius:7px;font-size:12.5px;overflow-x:auto">班級,週一,週二,週三,週四,週五
+第一節,國文(王大明),英文(李美麗),數學,自然,國文
+第二節,數學,國文,英文,地理,歷史
+第三節,體育,數學,音樂,英文,數學
+…
+班級,國一2班
+第一節,英文,國文(王大明),…</pre>
+      <div class="hint">每個班級一個區塊，以「班級」列開頭；儲存格可寫「科目(教師)」或只寫科目；多個班級區塊直接往下接。</div></div>
+    </details>
+    <label class="fld" style="margin-top:12px"><b>或直接貼上課表內容</b>
+      <textarea id="priorText" rows="8" placeholder="班級,週一,週二,…&#10;第一節,國文(王大明),英文,…"></textarea></label>
+    <div class="btn-row">
+      <button class="btn primary" id="parseCsv">解析規律格式</button>
+      <button class="btn gold" id="parseAi">AI 智慧解析（自由格式）</button>
+    </div>
+    <div id="priorPreview" style="margin-top:14px"></div>
+  </div>
+  <div class="card">
+    <h2>舊課表慣性設定</h2>
+    <div class="opt-line">
+      <div class="txt"><b>採用舊課表慣性</b><span>開啟後，新課表會盡量沿用過去科目所在的時段</span></div>
+      <label class="switch"><input type="checkbox" id="priorOn" ${S.prior.enabled?'checked':''}><i></i></label>
+    </div>
+    <label class="fld" style="margin-top:12px"><b>慣性權重（越高越像舊課表，但可能壓過科學原則）：<span id="pwVal">${S.prior.weight}</span></b>
+      <input type="range" id="priorWeight" min="0" max="60" value="${S.prior.weight}"></label>
+    <div class="hint">目前已學習：${learnedCount} 個班級科目組合${S.prior.source?'（來源：'+S.prior.source+'）':''}</div>
+    <button class="btn sm danger" id="clearPrior" style="margin-top:8px">清除已學習的舊課表</button>
+  </div>
+  <div class="card">
+    <h2>AI 快速建立設定</h2>
+    <div class="sub">用一句話描述學校規模，AI 會自動填入班級數等設定（需於右上角「AI 設定」填入免費 API Key）。</div>
+    <textarea id="nlText" rows="3" placeholder="例如：我們是完全中學，國一3班、國二3班、國三2班，高一2班、高二2班、高三1班，每天上8節，一週上5天。"></textarea>
+    <div class="btn-row"><button class="btn gold" id="nlRun">用 AI 建立設定</button></div>
+    <div class="btn-row"><button class="btn" id="backAssign">上一步</button><button class="btn primary" id="toGenerate3">下一步：一鍵排課</button></div>
+  </div>`;
+};
+function renderPriorPreview(){
+  const el=$('#priorPreview');if(!el)return;
+  if(!_learned){el.innerHTML='';return}
+  const L=_learned;
+  el.innerHTML=`<div style="border:1px solid var(--pine);border-radius:8px;padding:14px;background:var(--pine-ll)">
+    <b>解析結果預覽</b>
+    <div style="margin:8px 0;font-size:13px">
+      <span class="pill green">成功辨識 ${L.foundClasses.length} 個班級</span>
+      <span class="pill blue">新教師 ${L.newTeachers.length} 位</span>
+      ${L.missingClasses.length?`<span class="pill red">比對不到：${L.missingClasses.map(esc).join('、')}</span>`:''}
+      ${L.unknownSubjects.length?`<span class="pill gold">未識別科目：${L.unknownSubjects.map(esc).join('、')}</span>`:''}
+    </div>
+    <div class="hint" style="margin-bottom:10px">將自動建立新教師、更新授課配置，並記錄各科目舊時段作為排課偏好。</div>
+    <button class="btn primary sm" id="learnApply">採用解析結果</button>
+    <button class="btn sm" id="learnDiscard">捨棄</button>
+  </div>`;
+  $('#learnApply').onclick=()=>{applyLearned();_learned=null;toast('舊課表已學習並套用','ok');route()};
+  $('#learnDiscard').onclick=()=>{_learned=null;renderPriorPreview()};
+}
+MOUNTS.prior=()=>{
+  $('#pickCsv').onclick=()=>{window._fileMode='prior';$('#fileInput').click()};
+  if(window._priorImport){$('#priorText').value=window._priorImport;window._priorImport='';toast('檔案內容已載入，請點「解析規律格式」')}
+  $('#parseCsv').onclick=()=>{
+    const txt=$('#priorText').value.trim();
+    if(!txt)return toast('請先貼上或選擇舊課表檔案','err');
+    try{
+      const blocks=parseCSVtoBlocks(txt);
+      if(!blocks.length)return toast('沒有解析到任何班級區塊','err');
+      _learned=learnFromBlocks(blocks);
+      if(!_learned.foundClasses.length)return toast('班級名稱比對不到，請先在步驟三確認班級名單','err');
+      renderPriorPreview();toast('解析完成，請確認預覽');
+    }catch(err){toast('解析失敗：'+err.message,'err')}
+  };
+  $('#parseAi').onclick=async()=>{
+    const txt=$('#priorText').value.trim();
+    if(!txt)return toast('請先貼上舊課表內容','err');
+    if(!S.ai.key)return aiSettingsModal();
+    try{
+      toast('AI 解析中，請稍候…');
+      const prompt=`你是課表辨識助手。以下是某學校的舊課表文字，可能含多個班級。每個班級有若干節次（第一節起），每天 ${S.days} 天（週一到週${['一','二','三','四','五','六'][S.days-1]}）。
+請輸出 JSON，格式：
+{"blocks":[{"className":"班級名稱","rows":[{"p":0,"cells":[{"s":"科目名","t":"教師名或空字串"}]}]}]}
+p 為節次索引（第一節=0）；cells 長度必須為 ${S.days}，對應週一至週${['一','二','三','四','五','六'][S.days-1]}；空白或午休/升旗細胞給 {"s":"","t":""}；教師可能寫在科目後的括號裡。
+課表文字：
+"""${txt.slice(0,6000)}"""`;
+      const out=await aiChat(prompt);
+      const d=JSON.parse(out);
+      const blocks=d.blocks.map(b=>({className:b.className,rows:b.rows.map(r=>({p:r.p,cells:r.cells.map(c=>(c&&c.s?{sid:matchSubjectName(c.s),subjName:c.s,teacher:c.t||'',fixed:false}:null))}))}));
+      _learned=learnFromBlocks(blocks);
+      if(!_learned.foundClasses.length)return toast('AI 解析完成，但班級名稱比對不到','err');
+      renderPriorPreview();toast('AI 解析完成，請確認預覽','ok');
+    }catch(err){toast('AI 解析失敗：'+err.message,'err')}
+  };
+  $('#priorOn').onchange=e=>{S.prior.enabled=e.target.checked;save()};
+  $('#priorWeight').oninput=e=>{S.prior.weight=+e.target.value;$('#pwVal').textContent=e.target.value;save()};
+  $('#clearPrior').onclick=()=>{S.prior.data={};S.prior.enabled=false;S.prior.source='';_learned=null;save();route();toast('已清除舊課表資料')};
+  $('#nlRun').onclick=async()=>{
+    const txt=$('#nlText').value.trim();if(!txt)return toast('請輸入描述','err');
+    if(!S.ai.key)return aiSettingsModal();
+    try{
+      toast('AI 建立設定中…');
+      const prompt=`根據以下中文描述產出學校設定 JSON，鍵值：{"school":"","days":5,"junior":{"J1":0,"J2":0,"J3":0},"senior":{"S1":0,"S2":0,"S3":0},"periodsPerDay":8}。J1=國一 J2=國二 J3=國三 S1=高一 S2=高二 S3=高三，數字為班級數。只回傳 JSON。描述：${txt}`;
+      const d=JSON.parse(await aiChat(prompt));
+      if(d.school)S.school=d.school;
+      if(d.days)S.days=Math.min(6,Math.max(5,+d.days||5));
+      ['junior','senior'].forEach(k=>{if(d[k])Object.keys(S[k]).forEach(g=>{if(d[k][g]!=null)S[k][g]=Math.max(0,Math.min(30,+d[k][g]||0))})});
+      const ppd=+d.periodsPerDay;
+      if(ppd>=4&&ppd<=10&&ppd!==S.periods.length){
+        S.morningCount=Math.min(4,Math.floor(ppd/2));S.afternoonCount=ppd-S.morningCount;
+        const tl2=genTimeline('08:00',45,10,30,S.morningCount,S.afternoonCount);
+        S.periods=tl2.periods;S.lunch=tl2.lunch;
+      }
+      syncClasses();save();route();toast('AI 已建立設定，請繼續調整細節','ok');
+    }catch(err){toast('AI 建立失敗：'+err.message,'err')}
+  };
+  $('#backAssign').onclick=()=>location.hash='assign';
+  $('#toGenerate3').onclick=()=>location.hash='generate';
+};
+
+/* =========================================================
+   十六、排課引擎（限制滿足 CSP + 模擬退火）
+========================================================= */
+function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+const Solver={
+  async run(onLog,onProgress){
+    syncGroups();
+    const D=S.days,M=S.periods.length,N=D*M,morning=S.morningCount;
+    const fixed={};
+    if(S.flags.assembly)fixed[0]='升旗／朝會';
+    if(S.flags.meeting)fixed[(D-1)*M+(M-1)]='班會／週會';
+    const assignable=[];for(let s=0;s<N;s++)if(!fixed[s])assignable.push(s);
+
+    // 展開授課節次
+    const sessions=[];
+    S.groups.forEach(g=>{
+      for(let k=0;k<g.hours;k++)sessions.push({id:g.id+'_'+k,gid:g.id,cid:g.classId,sid:g.subjectId,
+        tid:g.teacherId||('virt_'+g.id),virt:!g.teacherId});
+    });
+    const sb={};sessions.forEach(x=>sb[x.id]=x);
+    const tCount={};sessions.forEach(x=>{if(!x.virt)tCount[x.tid]=(tCount[x.tid]||0)+1});
+    const unavail={};
+    S.teachers.forEach(t=>{unavail[t.id]=new Set(t.unavail||[])});
+    const priorSlot=(cid,sid,d,p)=>{
+      if(!S.prior.enabled)return false;
+      const row=S.prior.data[cid]&&S.prior.data[cid][sid];
+      return row&&row.includes(d+'-'+p);
+    };
+    const roomOf=sid=>{const s=subjectById(sid);return s&&s.room||null};
+    const roomCap=rt=>{const c=S.rooms[rt];return c>0?c:99};
+
+    function fresh(){
+      const grid={};S.classes.forEach(c=>grid[c.id]=new Array(N).fill(null));
+      const busy={};Object.keys(tCount).forEach(t=>busy[t]=new Uint8Array(N));
+      const roomUse={};
+      return {grid,busy,roomUse,clash:new Set()};
+    }
+    const hardOK=(st,x,slot,noDup)=>{
+      const d=Math.floor(slot/M),p=slot%M;
+      if(st.grid[x.cid][slot])return false;
+      if(S.rules.afterLunch&&p===morning){
+        const cat0=subjectById(x.sid).cat;
+        if(cat0==='core'||cat0==='society'||x.sid==='pe')return false;
+      }
+      if(!x.virt){
+        if(st.busy[x.tid][slot]>0)return false;
+        if(unavail[x.tid]&&unavail[x.tid].has(d+'-'+p))return false;
+        const t=teacherById(x.tid);
+        if(S.rules.teacherLoad){
+          let cnt=0;for(let q=0;q<M;q++)if(st.busy[x.tid][d*M+q])cnt++;
+          if(cnt>=(t&&t.maxDaily||S.maxDaily))return false;
+        }
+      }
+      if(noDup){
+        for(let q=0;q<M;q++){const id=st.grid[x.cid][d*M+q];if(id&&sb[id].sid===x.sid)return false}
+      }
+      const rt=roomOf(x.sid);
+      if(rt){const k=rt+'|'+slot;if((st.roomUse[k]||0)>=roomCap(rt))return false}
+      return true;
+    };
+    // 單格偏好分數（越小越好）
+    const placeWeight=(x,d,p)=>{
+      const s=subjectById(x.sid),cat=s.cat,R=S.rules;let pen=0;
+      if(R.morningCore){
+        if(cat==='core'){if(p<morning){pen+=[-20,-14,-8,-3][Math.min(p,3)]}else pen+=16+(p-morning)*4}
+        else if(cat==='society'){if(p<morning)pen+=-8-p*2;else pen+=8+(p-morning)*2}
+        else if(cat==='arts'){if(p<morning)pen+=7;else pen-=4}
+        else if(cat==='skill'){if(p<morning)pen+=2;else pen-=2}
+      }
+      if(R.afterLunch&&p===morning){if(cat==='core'||cat==='society')pen+=26;if(x.sid==='pe')pen+=30}
+      if(x.sid==='pe'&&p===0)pen+=5;
+      if(R.friAfternoon&&d===D-1&&p>=M-2&&(cat==='core'||cat==='society'))pen+=14;
+      if(R.monFirst&&d===0&&p===0)pen+=4;
+      if(S.prior.enabled&&priorSlot(x.cid,x.sid,d,p))pen-=S.prior.weight;
+      return pen;
+    };
+    // 資源稀缺度：專科教室總需求 / 可容量；用於派位順序與選位
+    const pressure={};
+    const subjSessions={};sessions.forEach(x=>subjSessions[x.sid]=(subjSessions[x.sid]||0)+1);
+    S.subjects.forEach(s=>{
+      if(s.room){const cap=roomCap(s.room)*assignable.length;pressure[s.id]=cap?(subjSessions[s.id]||0)/cap:0}
+    });
+    function greedy(seed){
+      const rnd=mulberry(seed),st=fresh();
+      const order=sessions.slice().sort((a,b)=>{
+        const pa=pressure[a.sid]||0,pb=pressure[b.sid]||0;
+        if(pb!==pa)return pb-pa;
+        const ta=a.virt?0:(tCount[a.tid]||0),tb=b.virt?0:(tCount[b.tid]||0);
+        if(tb!==ta)return tb-ta;
+        const ca=subjectById(a.sid).cat==='core'?1:0,cb=subjectById(b.sid).cat==='core'?1:0;
+        if(cb!==ca)return cb-ca;
+        return rnd()-.5;
+      });
+      const unplaced=[];
+      const put=(x,slot,clash)=>{
+        const d=Math.floor(slot/M),p=slot%M;
+        st.grid[x.cid][slot]=x.id;
+        if(!x.virt)st.busy[x.tid][slot]++;
+        const rt=roomOf(x.sid);if(rt)st.roomUse[rt+'|'+slot]=(st.roomUse[rt+'|'+slot]||0)+1;
+        if(clash){st.clash.add(x.id);unplaced.push(x.id)}
+      };
+      for(const x of order){
+        const free=assignable.filter(s=>!st.grid[x.cid][s]);
+        let cand=free.filter(s=>hardOK(st,x,s,true));
+        let relaxed=false;
+        if(!cand.length){cand=free.filter(s=>hardOK(st,x,s,false));relaxed=true}
+        if(cand.length){
+          let best=null,bs=1e9;
+          for(const slot of cand){
+            const d=Math.floor(slot/M),p=slot%M;let pen=placeWeight(x,d,p);
+            if(relaxed&&S.rules.noRepeat){
+              for(let q=0;q<M;q++){const id=st.grid[x.cid][d*M+q];if(id&&sb[id].sid===x.sid)pen+=70}
+            }
+            // 專科教室即時飽和度：優先使用還有空間的時段
+            const rt0=roomOf(x.sid);
+            if(rt0){const cap0=roomCap(rt0),used0=st.roomUse[rt0+'|'+slot]||0;pen+=(used0/cap0)*28}
+            if(!x.virt){
+              let cnt=0,minP=99,maxP=-1;
+              for(let q=0;q<M;q++)if(st.busy[x.tid][d*M+q]){cnt++;minP=Math.min(minP,q);maxP=Math.max(maxP,q)}
+              if(cnt){
+                if(p>=minP&&p<=maxP)pen-=4;else pen+=3;
+                let run=1;for(let q=p-1;q>=0&&st.busy[x.tid][d*M+q];q--)run++;for(let q=p+1;q<M&&st.busy[x.tid][d*M+q];q++)run++;
+                if(run>S.maxConsecutive)pen+=22;
+              }
+            }
+            // 班級當天主科數平衡
+            const cat=subjectById(x.sid).cat;
+            if(cat==='core'||cat==='society'){
+              let cc=0;for(let q=0;q<M;q++){const id=st.grid[x.cid][d*M+q];if(id){const c2=subjectById(sb[id].sid).cat;if(c2==='core'||c2==='society')cc++}}
+              pen+=cc*3;
+              if(S.rules.fatigue){
+                [p-1,p+1].forEach(q=>{if(q>=0&&q<M){const id=st.grid[x.cid][d*M+q];if(id){const c2=subjectById(sb[id].sid).cat;if(c2==='core'||c2==='society')pen+=5}}});
+              }
+            }
+            pen+=(rnd()*4-2);
+            if(pen<bs){bs=pen;best=slot}
+          }
+          put(x,best,false);
+        }else if(!free.length){
+          // 可排時段用盡（節數超過一週總時段）
+          unplaced.push(x.id);st.clash.add(x.id);
+        }else{
+          // 硬性條件無解：選衝突最少的位置，稍後由退火修復或回報
+          let best=free[0],bs=1e9;
+          for(const slot of free){
+            const d=Math.floor(slot/M),p=slot%M;let pen=placeWeight(x,d,p);
+            if(!x.virt&&st.busy[x.tid][slot])pen+=150;
+            const rt=roomOf(x.sid);if(rt&&(st.roomUse[rt+'|'+slot]||0)>=roomCap(rt))pen+=120;
+            if(!x.virt&&unavail[x.tid]&&unavail[x.tid].has(d+'-'+p))pen+=200;
+            if(S.rules.noRepeat){for(let q=0;q<M;q++){const id=st.grid[x.cid][d*M+q];if(id&&sb[id].sid===x.sid)pen+=70}}
+            pen+=(rnd()*6);
+            if(pen<bs){bs=pen;best=slot}
+          }
+          put(x,best,true);
+        }
+      }
+      return {st,unplaced};
+    };
+
+    // ---- 整體懲罰 ----
+    function classPenalty(st,cid){
+      let pen=0;const D2=D;
+      const daySubj={},dayHard=Array(D2).fill(0);
+      const groupSlots={};
+      for(let d=0;d<D2;d++){
+        const m={};
+        for(let p=0;p<M;p++){
+          const id=st.grid[cid][d*M+p];if(!id||id.startsWith('FIX'))continue;
+          const x=sb[id],s=subjectById(x.sid),cat=s.cat;
+          m[x.sid]=(m[x.sid]||0)+1;
+          (groupSlots[x.gid]=groupSlots[x.gid]||[]).push({d,p});
+          pen+=placeWeight(x,d,p);
+          if(cat==='core'||cat==='society')dayHard[d]++;
+          if(S.rules.fatigue&&p+1<M){const id2=st.grid[cid][d*M+p+1];if(id2&&!id2.startsWith('FIX')){const c2=subjectById(sb[id2].sid).cat;if((cat==='core')&&c2==='core')pen+=5}}
+        }
+        daySubj[d]=m;
+      }
+      if(S.rules.noRepeat)Object.values(daySubj).forEach(m=>Object.values(m).forEach(n=>{if(n>1)pen+=(n-1)*70}));
+      const mean=dayHard.reduce((a,b)=>a+b,0)/D2;
+      pen+=dayHard.reduce((a,b)=>a+(b-mean)*(b-mean),0)*9;
+      if(S.rules.spacing){
+        Object.entries(groupSlots).forEach(([gid,arr])=>{
+          if(arr.length<2)return;
+          const days=[...new Set(arr.map(a=>a.d))].sort((a,b)=>a-b);
+          const ideal=(D2-1)/Math.max(1,arr.length-1);
+          for(let i=1;i<days.length;i++)pen+=Math.abs((days[i]-days[i-1])-ideal)*3;
+        });
+      }
+      return pen;
+    }
+    function teacherPenalty(st,tid){
+      const t=teacherById(tid);if(!t)return 0;
+      let pen=0,maxD=t.maxDaily||S.maxDaily;
+      const uv=unavail[tid];
+      for(let d=0;d<D;d++){
+        const ps=[];for(let p=0;p<M;p++)if(st.busy[tid][d*M+p])ps.push(p);
+        if(!ps.length)continue;
+        const cnt=ps.reduce((a,p)=>a+st.busy[tid][d*M+p],0);
+        if(S.rules.teacherLoad&&cnt>maxD)pen+=(cnt-maxD)*120;
+        let run=1,best=1;
+        for(let i=1;i<ps.length;i++){if(ps[i]===ps[i-1]+1){run++;best=Math.max(best,run)}else run=1}
+        if(S.rules.teacherLoad&&best>S.maxConsecutive)pen+=(best-S.maxConsecutive)*30;
+        if(S.rules.teacherGap)pen+=(ps[ps.length-1]-ps[0]+1-ps.length)*5;
+        if(uv)ps.forEach(p=>{if(uv.has(d+'-'+p))pen+=200});
+      }
+      return pen;
+    }
+    function roomViolAt(st,slot){
+      let pen=0;
+      const counts={};
+      S.classes.forEach(c=>{
+        const id=st.grid[c.id][slot];if(!id||id.startsWith('FIX')||id.startsWith('FIX'))return;
+        const rt=roomOf(sb[id].sid);if(rt)counts[rt]=(counts[rt]||0)+1;
+      });
+      Object.entries(counts).forEach(([rt,n])=>{if(n>roomCap(rt))pen+=(n-roomCap(rt))*120});
+      return pen;
+    }
+
+    // ---- 模擬退火 ----
+    async function anneal(st,seed,onLog){
+      const rnd=mulberry(seed^0x9e3779b9);
+      const cids=S.classes.map(c=>c.id);
+      const classPen={},tPen={};
+      cids.forEach(c=>classPen[c]=classPenalty(st,c));
+      Object.keys(st.busy).forEach(t=>tPen[t]=teacherPenalty(st,t));
+      let roomPen=0;for(let s=0;s<N;s++)roomPen+=roomViolAt(st,s);
+      let total=Object.values(classPen).reduce((a,b)=>a+b,0)+Object.values(tPen).reduce((a,b)=>a+b,0)+roomPen;
+      const ITERS=26000,T0=14,T1=.25;
+      for(let it=0;it<ITERS;it++){
+        if(it%2600===0){onProgress(.2+it/ITERS*.78);await sleep(0)}
+        const T=T0*Math.pow(T1/T0,it/ITERS);
+        const cid=cids[Math.floor(rnd()*cids.length)];
+        const s1=assignable[Math.floor(rnd()*assignable.length)];
+        const id1=st.grid[cid][s1];
+        if(!id1||id1.startsWith('FIX'))continue;
+        const s2=assignable[Math.floor(rnd()*assignable.length)];
+        if(s1===s2)continue;
+        const id2=st.grid[cid][s2];
+        if(id2&&id2.startsWith('FIX'))continue;
+        const x1=sb[id1],x2=id2?sb[id2]:null;
+        // 暫撤
+        const undo=[];
+        const take=(id,slot,dir)=>{
+          const x=sb[id];
+          if(!x.virt){st.busy[x.tid][slot]+=dir;undo.push(()=>st.busy[x.tid][slot]-=dir)}
+          const rt=roomOf(x.sid);if(rt){st.roomUse[rt+'|'+slot]+=dir;undo.push(()=>st.roomUse[rt+'|'+slot]-=dir)}
+        };
+        take(id1,s1,-1);if(id2)take(id2,s2,-1);
+        // 檢查新位置可行性（撞堂、禁用時段、教室）
+        let ok=true;
+        const check=(x,slot)=>{
+          const d=Math.floor(slot/M),p=slot%M;
+          if(!x.virt){
+            if(st.busy[x.tid][slot]>0)return false;
+            if(unavail[x.tid]&&unavail[x.tid].has(d+'-'+p))return false;
+          }
+          const rt=roomOf(x.sid);if(rt&&(st.roomUse[rt+'|'+slot]||0)>=roomCap(rt))return false;
+          if(S.rules.afterLunch&&p===morning){
+            const cat0=subjectById(x.sid).cat;
+            if(cat0==='core'||cat0==='society'||x.sid==='pe')return false;
+          }
+          if(S.rules.noRepeat){
+            for(let q=0;q<M;q++){
+              const pos=d*M+q;
+              if(pos===s1||pos===s2)continue;
+              const id=st.grid[cid][pos];
+              if(id&&!id.startsWith('FIX')&&sb[id].sid===x.sid)return false;
+            }
+          }
+          return true;
+        };
+        if(!check(x1,s2))ok=false;
+        if(x2&&!check(x2,s1))ok=false;
+        if(ok){
+          const oldC=classPen[cid];
+          const tids=[...new Set([x1.tid,x2?x2.tid:null].filter(t=>t&&!t.startsWith('virt')))];
+          const oldT=tids.map(t=>tPen[t]);
+          const oldR=roomViolAt(st,s1)+roomViolAt(st,s2);
+          st.grid[cid][s1]=x2?x2.id:null;st.grid[cid][s2]=x1.id;
+          if(x2){take(x2.id,s1,1)}take(x1.id,s2,1);
+          const newC=classPenalty(st,cid);
+          const newT=tids.map(t=>teacherPenalty(st,t));
+          const newR=roomViolAt(st,s1)+roomViolAt(st,s2);
+          const delta=(newC-oldC)+newT.reduce((a,b,i)=>a+b-oldT[i],0)+(newR-oldR);
+          if(delta<=0||rnd()<Math.exp(-delta/T)){
+            total+=delta;classPen[cid]=newC;tids.forEach((t,i)=>tPen[t]=newT[i]);
+            st.clash.delete(x1.id);if(x2)st.clash.delete(x2.id);
+            continue;
+          }
+        }
+        // 回復
+        undo.forEach(fn=>fn());
+        st.grid[cid][s1]=id1;st.grid[cid][s2]=id2;
+      }
+      return total;
+    }
+
+    // ---- 確定性修復：同日重複與教師撞堂 ----
+    const vacate=(st,id,pos)=>{
+      const x=sb[id];st.grid[x.cid][pos]=null;
+      if(!x.virt)st.busy[x.tid][pos]--;
+      const rt=roomOf(x.sid);if(rt)st.roomUse[rt+'|'+pos]=Math.max(0,(st.roomUse[rt+'|'+pos]||0)-1);
+      st.clash.delete(id);
+    };
+    const place=(st,id,pos)=>{
+      const x=sb[id];st.grid[x.cid][pos]=id;
+      if(!x.virt)st.busy[x.tid][pos]++;
+      const rt=roomOf(x.sid);if(rt)st.roomUse[rt+'|'+pos]=(st.roomUse[rt+'|'+pos]||0)+1;
+    };
+    const canLand=(st,id,pos)=>{
+      const x=sb[id],d=Math.floor(pos/M),p=pos%M;
+      if(!x.virt){
+        if(st.busy[x.tid][pos]>0)return false;
+        const t=teacherById(x.tid);
+        if(unavail[x.tid]&&unavail[x.tid].has(d+'-'+p))return false;
+        if(S.rules.teacherLoad){
+          let cnt=0;for(let q=0;q<M;q++)cnt+=st.busy[x.tid][d*M+q];
+          if(cnt>=(t&&t.maxDaily||S.maxDaily))return false;
+        }
+      }
+      const rt=roomOf(x.sid);if(rt&&(st.roomUse[rt+'|'+pos]||0)>=roomCap(rt))return false;
+      if(S.rules.afterLunch&&p===morning){const cat=subjectById(x.sid).cat;if(cat==='core'||cat==='society'||x.sid==='pe')return false}
+      if(S.rules.noRepeat){
+        for(let q=0;q<M;q++){const o=st.grid[x.cid][d*M+q];if(o&&!o.startsWith('FIX')&&sb[o].sid===x.sid)return false}
+      }
+      return true;
+    };
+    function tryRelocate(st,cid,id,from,requireOtherDay){
+      const x=sb[id],fromDay=Math.floor(from/M);
+      const empties=[],occupied=[];
+      for(const t of assignable){
+        if(t===from)continue;const d=Math.floor(t/M);
+        if(requireOtherDay&&d===fromDay)continue;
+        if(!st.grid[cid][t])empties.push(t);
+        else{const yid=st.grid[cid][t];if(sb[yid].sid!==x.sid)occupied.push(t)}
+      }
+      empties.sort((a,b)=>placeWeight(x,Math.floor(a/M),a%M)-placeWeight(x,Math.floor(b/M),b%M));
+      vacate(st,id,from);
+      // A：直接搬到空格
+      for(const t of empties){if(canLand(st,id,t)){place(st,id,t);return true}}
+      // B：與他科直接交換
+      for(const t of occupied){
+        const yid=st.grid[cid][t];
+        vacate(st,yid,t);
+        if(canLand(st,id,t)&&canLand(st,yid,from)){place(st,id,t);place(st,yid,from);return true}
+        // C：兩步連鎖（x→t，y→空格 z）
+        if(canLand(st,id,t)){
+          for(const z of empties){
+            if(z===t||z===from)continue;
+            if(canLand(st,yid,z)){place(st,id,t);place(st,yid,z);return true}
+          }
+        }
+        place(st,yid,t);
+      }
+      place(st,id,from);
+      return false;
+    }
+    function repairAll(st){
+      for(let round=0;round<60;round++){
+        let moved=false;
+        // 同日同科重複
+        for(const cid of S.classes.map(c=>c.id)){
+          for(let d=0;d<D;d++){
+            const bySid={};
+            for(let p=0;p<M;p++){const id=st.grid[cid][d*M+p];if(id&&!id.startsWith('FIX')){(bySid[sb[id].sid]=bySid[sb[id].sid]||[]).push(id)}
+            }
+            for(const sid in bySid){
+              const arr=bySid[sid];
+              for(let k=1;k<arr.length;k++){
+                const id=arr[k];const pos=st.grid[cid].indexOf(id);
+                if(tryRelocate(st,cid,id,pos,true)){moved=true;break}
+              }
+            }
+          }
+        }
+        // 教師撞堂
+        for(const tid of Object.keys(st.busy)){
+          for(let s=0;s<N;s++){
+            if(st.busy[tid][s]<=1)continue;
+            for(const c of S.classes){
+              const id=st.grid[c.id][s];
+              if(id&&sb[id].tid===tid){if(tryRelocate(st,c.id,id,s,false)){moved=true;break}}
+            }
+          }
+        }
+        // 專科教室超載：把該時段多餘的場地課程疏散
+        for(let s=0;s<N;s++){
+          const cnt={};
+          S.classes.forEach(c=>{const id=st.grid[c.id][s];if(id&&!id.startsWith('FIX')){const rt=roomOf(sb[id].sid);if(rt)cnt[rt]=(cnt[rt]||[]).concat([[c.id,id]])}});
+          for(const rt in cnt){
+            let arr=cnt[rt],cap=roomCap(rt);
+            while(arr.length>cap){
+              const [cid,id]=arr.shift();
+              if(tryRelocate(st,cid,id,s,false)){moved=true}else{arr.push([cid,id]);break}
+            }
+          }
+        }
+        // 其他 fallback 節次（政策違例、容量不足）最後嘗試疏散
+        for(const id of [...st.clash]){
+          let pos=-1,cid=sb[id].cid;
+          pos=st.grid[cid].indexOf(id);
+          if(pos>=0&&tryRelocate(st,cid,id,pos,false))moved=true;
+        }
+        if(!moved)break;
+      }
+    }
+    const totalPenalty=st=>{
+      let p=0;
+      S.classes.forEach(c=>p+=classPenalty(st,c.id));
+      Object.keys(st.busy).forEach(t=>p+=teacherPenalty(st,t));
+      for(let s=0;s<N;s++)p+=roomViolAt(st,s);
+      return p;
+    };
+
+    // ---- 多次重啟取最佳 ----
+    let best=null;
+    for(let attempt=1;attempt<=3;attempt++){
+      onLog(`第 ${attempt} 輪：以啟發式規則進行初始派位…`);onProgress(.05);await sleep(0);
+      const {st,unplaced}=greedy(attempt*7919+13);
+      onLog(`第 ${attempt} 輪：初始派位完成，${unplaced.length} 節需協調，開始模擬退火最佳化…`);
+      await anneal(st,attempt*104729+7,onLog);
+      repairAll(st);
+      const score=totalPenalty(st);
+      // 實際殘留衝突掃描
+      let clashes=0,dupCount=0;
+      Object.values(st.busy).forEach(arr=>{for(let i=0;i<N;i++)if(arr[i]>1)clashes++});
+      S.classes.forEach(c=>{for(let d=0;d<D;d++){const m={};for(let p=0;p<M;p++){const id=st.grid[c.id][d*M+p];if(id&&!id.startsWith('FIX')){const sid=sb[id].sid;m[sid]=(m[sid]||0)+1}}Object.values(m).forEach(n=>{if(n>1)dupCount++})}});
+      let roomOver=0;for(let s=0;s<N;s++)roomOver+=roomViolAt(st,s)/120;
+      const metric=unplaced.length*2000+clashes*500+dupCount*300+Math.round(roomOver)*200+Math.round(score);
+      onLog(`第 ${attempt} 輪完成：最佳化分數 ${Math.round(score)}，殘留撞堂 ${clashes} 處。`);
+      if(!best||metric<best.metric)best={st,score,unplaced,clashes,metric};
+      onProgress(.2+.26*attempt);
+    }
+
+    // ---- 組裝結果與警示 ----
+    const {st,score,unplaced}=best;
+    const gridOut={};
+    S.classes.forEach(c=>{
+      gridOut[c.id]=[];
+      for(let s=0;s<N;s++){
+        if(fixed[s]){gridOut[c.id].push({fixed:fixed[s]});continue}
+        const id=st.grid[c.id][s];
+        if(!id){gridOut[c.id].push(null);continue}
+        const x=sb[id];
+        gridOut[c.id].push({gid:x.gid,sid:x.sid,tid:x.virt?null:x.tid,clash:st.clash.has(id)});
+      }
+    });
+    const reds=[],golds=[];
+    if(unplaced.length){
+      const byClass={};
+      unplaced.forEach(id=>{const x=sb[id];byClass[x.cid]=(byClass[x.cid]||0)+1});
+      reds.push('有 '+unplaced.length+' 節因每週可排時段或專科教室不足而無法排入（'+Object.entries(byClass).map(([cid,n])=>classById(cid).name+' '+n+'節').join('、')+'），請增加每日節數、專科教室數量，或減少科目節數。');
+    }
+    const missing=missingAssignments();
+    if(missing.length){
+      const bySubj={};missing.forEach(g=>{const s=subjectById(g.subjectId);bySubj[s.name]=(bySubj[s.name]||0)+g.hours});
+      reds.push('有 '+missing.length+' 個班級科目尚未配置教師（'+Object.entries(bySubj).map(([k,v])=>k+' '+v+'節').join('、')+'），課表中已先排入並標註「待聘」，請補教師後重新排課。');
+    }
+    Object.entries(st.busy).forEach(([tid,arr])=>{
+      for(let d=0;d<D;d++){
+        let cnt=0;for(let p=0;p<M;p++)cnt+=arr[d*M+p];
+        const t=teacherById(tid);const max=t&&t.maxDaily||S.maxDaily;
+        if(cnt>max)reds.push(`${t?t.name:'教師'} ${DAY_NAMES[d]}排了 ${cnt} 節，超過每日上限 ${max} 節，請增加該科教師。`);
+        for(let p=0;p<M;p++)if(arr[d*M+p]>1)reds.push(`${t?t.name:'教師'} ${DAY_NAMES[d]}${S.periods[p].name}發生撞堂（同時出現在多個班級）。`);
+      }
+    });
+    S.teachers.forEach(t=>(t.unavail||[]).forEach(k=>{
+      const [d,p]=k.split('-').map(Number);
+      let hit=false;S.classes.forEach(c=>{const cell=gridOut[c.id][d*M+p];if(cell&&cell.tid===t.id)hit=true});
+      if(hit)reds.push(`${t.name} 在 ${DAY_NAMES[d]}${S.periods[p].name} 被安排課程，但該時段已設定為不排課。`);
+    }));
+    // 同日同科重複與午休保護（通常只在整體容量不足時才會殘留）
+    S.classes.forEach(c=>{
+      for(let d=0;d<D;d++){
+        const seen={};
+        for(let p=0;p<M;p++){
+          const cell=gridOut[c.id][d*M+p];if(!cell||cell.fixed)continue;
+          const s=subjectById(cell.sid);seen[cell.sid]=(seen[cell.sid]||[]);seen[cell.sid].push({s,p});
+        }
+        Object.values(seen).forEach(arr=>{if(arr.length>1)reds.push(`${c.name} ${DAY_NAMES[d]}同日排了 ${arr.length} 節${arr[0].s.name}，請調整教師量或節數。`)});
+        const al=gridOut[c.id][d*M+morning];
+        if(al&&!al.fixed){const s=subjectById(al.sid),cat=s.cat;
+          if(cat==='core'||cat==='society')reds.push(`${c.name} ${DAY_NAMES[d]}午休後第一節排了${s.name}（通常因上午時段或專科教室不足）。`);
+          if(al.sid==='pe')reds.push(`${c.name} ${DAY_NAMES[d]}午休後第一節排了體育，請調整。`);
+        }
+      }
+    });
+    Object.entries(st.roomUse).forEach(([k,n])=>{
+      const [rt,slot]=k.split('|');const cap=roomCap(rt);
+      if(n>cap){const d=Math.floor(+slot/M),p=+slot%M;golds.push(`${DAY_NAMES[d]}${S.periods[p].name}「${ROOM_NAMES[rt]}」需容納 ${n} 個班，但只有 ${cap} 間，請考慮增設場地或調整。`)}
+    });
+    const capList=(arr,type)=>arr.slice(0,12).map(text=>({type,text}))
+      .concat(arr.length>12?[{type,text:`另有 ${arr.length-12} 項同類問題未列出，請依上述原因調整資料後重新排課。`}]:[]);
+    const warnings=capList(reds,'red').concat(capList(golds,'gold'));
+    // 班級統計
+    const classStats=S.classes.map(c=>{
+      const perDay=Array(D).fill(0),corePerDay=Array(D).fill(0);
+      gridOut[c.id].forEach((cell,i)=>{if(cell&&!cell.fixed){const d=Math.floor(i/M);perDay[d]++;if(cell.sid){const cat=subjectById(cell.sid).cat;if(cat==='core'||cat==='society')corePerDay[d]++}}});
+      return {cid:c.id,perDay,corePerDay};
+    });
+    const teacherStats=S.teachers.map(t=>{
+      const perDay=Array(D).fill(0),gapsPerDay=Array(D).fill(0);
+      for(let d=0;d<D;d++){
+        const ps=[];for(let p=0;p<M;p++){let n=0;S.classes.forEach(c=>{const cell=gridOut[c.id][d*M+p];if(cell&&cell.tid===t.id)n++});if(n){ps.push(p);perDay[d]+=n}}
+        if(ps.length>1)gapsPerDay[d]=ps[ps.length-1]-ps[0]+1-ps.length;
+      }
+      return {tid:t.id,perDay,gaps:gapsPerDay.reduce((a,b)=>a+b,0),total:perDay.reduce((a,b)=>a+b,0)};
+    });
+    S.result={grid:gridOut,fixed,D,M,morning,warnings,score:Math.round(score),
+      stats:{classes:classStats,teachers:teacherStats},generatedAt:new Date().toLocaleString('zh-TW')};
+    save();
+    onLog(warnings.length?`排課完成，但有 ${warnings.length} 項警示需檢視。`:'排課完成：零撞堂、零超時，全部科學規則皆已滿足。');
+    onProgress(1);
+    return S.result;
+  }
+};
+
+/* =========================================================
+   十七、視圖：一鍵排課
+========================================================= */
+VIEWS.generate=()=>{
+  syncGroups();
+  const miss=missingAssignments();
+  const checks=[
+    ['班級資料',totalClasses()>0,`${totalClasses()} 個班級`],
+    ['節次時間',S.periods.length>0,`每日 ${S.periods.length} 節`],
+    ['科目節數',S.groups.length>0,`${S.groups.reduce((a,g)=>a+g.hours,0)} 節/週`],
+    ['教師配置',miss.length===0&&S.teachers.length>0,miss.length?`${miss.length} 個科目待配置`:'已全數配置']
+  ];
+  const rules=[
+    ['morningCore','主科排在上午高效時段','國文、英文、數學、自然等優先排上午前幾節'],
+    ['afterLunch','午休後第一節保護','不排高認知主科與體育，避免飯後學習低落'],
+    ['noRepeat','同日同科不重複','同一班同一天不重複上同一科目（節數不足時才放寬）'],
+    ['teacherLoad','教師負荷上限','每日節數上限、避免連續授課超過 '+S.maxConsecutive+' 節'],
+    ['teacherGap','最小化教師空堂','減少老師第一節與最後一節之間的在校等待'],
+    ['friAfternoon','週五下午輕負荷','週五末兩節優先安排藝能、社團等輕鬆科目'],
+    ['spacing','間隔複習','同一科目在一週內儘量均勻分散，强化記憶保留'],
+    ['fatigue','避免連續高難度','同班相鄰兩節儘量不全是主科，降低認知疲勞'],
+    ['monFirst','週一第一節緩衝','略微降低週一第一節排主科的優先級']
+  ];
+  return `
+  <div class="card">
+    <h2><span class="step-tag">步驟 8</span>排課前檢查</h2>
+    <div class="grid2" style="margin:12px 0">
+      ${checks.map(c=>`<div class="rule-card"><div class="ricon">${svgIcon(c[1]?'check':'warn',16)}</div><div><b>${c[0]}</b><p style="color:${c[1]?'var(--pine-d)':'var(--cinnabar)'}">${c[2]}</p></div></div>`).join('')}
+    </div>
+    ${S.prior.enabled?`<span class="pill blue">已啟用舊課表慣性（權重 ${S.prior.weight}）</span>`:'<span class="pill gray">未使用舊課表慣性</span>'}
+  </div>
+  <div class="card">
+    <h2>科學排課規則</h2>
+    <div class="sub">可依學校實際狀況關閉特定規則；關閉越多，排課空間越大但越不符合疲勞防護原則。</div>
+    ${rules.map(([k,t,d])=>`
+      <div class="rule-card"><div class="ricon">${svgIcon('gear',15)}</div>
+        <div style="flex:1"><b>${t}</b><p>${d}</p></div>
+        <label class="switch"><input type="checkbox" data-rule="${k}" ${S.rules[k]?'checked':''}><i></i></label>
+      </div>`).join('')}
+  </div>
+  <div class="card">
+    <h2>開始自動排課</h2>
+    <div class="sub">引擎會以「限制滿足演算法」先完成零撞堂派位，再以模擬退火反覆調整三輪，讓課表同時符合教師負荷與學習節律。</div>
+    <button class="btn primary big" id="runSolver" ${checks.slice(0,3).some(c=>!c[1])?'disabled':''}>一 鍵 排 課</button>
+    <div class="progress-track" style="margin-top:16px"><i id="solveBar"></i></div>
+    <div class="log-box" id="solveLog" style="margin-top:10px">尚未開始。</div>
+    <div class="btn-row">
+      <button class="btn" id="backPrior">上一步</button>
+      <button class="btn primary" id="seeResult" style="display:none">前往課表總覽</button>
+    </div>
+  </div>`;
+};
+MOUNTS.generate=()=>{
+  $all('[data-rule]').forEach(cb=>cb.onchange=()=>{S.rules[cb.dataset.rule]=cb.checked;save()});
+  $('#backPrior').onclick=()=>location.hash='prior';
+  const see=$('#seeResult');
+  if(S.result)see.style.display='inline-flex';
+  see.onclick=()=>location.hash='result';
+  $('#runSolver').onclick=async()=>{
+    const btn=$('#runSolver');btn.disabled=true;
+    const log=$('#solveLog'),bar=$('#solveBar');log.textContent='';
+    const L=m=>{log.textContent+=m+'\n';log.scrollTop=log.scrollHeight};
+    const P=v=>bar.style.width=Math.round(v*100)+'%';
+    try{
+      await Solver.run(L,P);
+      see.style.display='inline-flex';
+      setTimeout(()=>location.hash='result',700);
+    }catch(e){console.error(e);L('排課失敗：'+e.message);toast('排課失敗：'+e.message,'err')}
+    btn.disabled=false;
+  };
+};
+
+/* =========================================================
+   十八、視圖：課表總覽
+========================================================= */
+let TT={tab:'class',pickId:null,pickSlot:null};
+function buildBusy(){
+  const r=S.result;if(!r)return null;
+  const busy={},roomUse={};
+  S.teachers.forEach(t=>busy[t.id]=new Uint8Array(r.D*r.M));
+  S.classes.forEach(c=>r.grid[c.id].forEach((cell,i)=>{
+    if(!cell||cell.fixed)return;
+    if(cell.tid&&busy[cell.tid])busy[cell.tid][i]++;
+    const s=subjectById(cell.sid);if(s&&s.room){const k=s.room+'|'+i;roomUse[k]=(roomUse[k]||0)+1}
+  }));
+  return {busy,roomUse};
+}
+function ttHead(r,withTime){
+  let h='<tr><th class="time-col">節次／時間</th>'+DAY_NAMES.slice(0,r.D).map(d=>`<th>${d}</th>`).join('')+'</tr>';
+  return h;
+}
+function studyRow(r){
+  if(!S.flags.study)return '';
+  return `<tr><td class="time-col study"><b>早自習</b>${S.studyTime.start}<br>${S.studyTime.end}</td>
+    ${Array(r.D).fill('<td class="study"><div class="sub">早自習</div></td>').join('')}</tr>`;
+}
+function classGridHTML(cid){
+  const r=S.result;
+  let body=studyRow(r);
+  for(let p=0;p<r.M;p++){
+    const pr=S.periods[p]||{name:PERIOD_NAMES[p],start:'',end:''};
+    body+=`<tr><td class="time-col"><b>${pr.name}</b>${pr.start||''}<br>${pr.end||''}</td>`;
+    for(let d=0;d<r.D;d++){
+      const slot=d*r.M+p,cell=r.grid[cid][slot];
+      if(cell&&cell.fixed){body+=`<td class="fixed"><div class="sub">${cell.fixed}</div></td>`;continue}
+      if(!cell){body+=`<td class="empty-cell"></td>`;continue}
+      const s=subjectById(cell.sid);
+      const col=subjColor(s);
+      const tea=cell.tid?teacherById(cell.tid):null;
+      const cls=(cell.clash||!cell.tid)?'unassigned':'';
+      body+=`<td class="${cls}" style="background:${col}1F" data-slot="${slot}">
+        <div class="sub" style="color:${col}">${s.name}</div>
+        <div class="tea">${tea?esc(tea.name):'<span style="color:var(--cinnabar)">待聘教師</span>'}</div></td>`;
+    }
+    body+='</tr>';
+    if(p===r.morning-1){
+      body+=`<tr><td class="time-col break"><b>午休</b><br>${S.lunch.start}</td><td class="break" colspan="${r.D}">午休 ${S.lunch.start}–${S.lunch.end}（不排課）</td></tr>`;
+    }
+  }
+  return `<table class="timetable" style="--d:${r.D}"><colgroup><col class="time-col">${Array(r.D).fill('<col>').join('')}</colgroup><thead>${ttHead(r)}</thead><tbody>${body}</tbody></table>`;
+}
+function teacherGridHTML(tid){
+  const r=S.result;const t=teacherById(tid);
+  let body=studyRow(r);
+  for(let p=0;p<r.M;p++){
+    const pr=S.periods[p]||{name:PERIOD_NAMES[p],start:'',end:''};
+    body+=`<tr><td class="time-col"><b>${pr.name}</b>${pr.start||''}<br>${pr.end||''}</td>`;
+    for(let d=0;d<r.D;d++){
+      const slot=d*r.M+p;
+      if(r.fixed[slot]){body+='<td class="fixed"></td>';continue}
+      let found=null;
+      S.classes.forEach(c=>{const cell=r.grid[c.id][slot];if(cell&&cell.tid===tid)found={c,cell}});
+      if(found){const s=subjectById(found.cell.sid),col=subjColor(s);
+        body+=`<td style="background:${col}1F"><div class="sub" style="color:${col}">${esc(found.c.name)}</div><div class="tea">${s.name}</div></td>`;
+      }else{
+        const off=(t.unavail||[]).includes(d+'-'+p);
+        body+=off?'<td class="fixed"><div class="tea">不排課</div></td>':'<td class="empty-cell"></td>';
+      }
+    }
+    body+='</tr>';
+    if(p===r.morning-1)body+=`<tr><td class="time-col break"><b>午休</b></td><td class="break" colspan="${r.D}">${S.lunch.start}–${S.lunch.end}</td></tr>`;
+  }
+  return `<table class="timetable"><colgroup><col class="time-col">${Array(r.D).fill('<col>').join('')}</colgroup><thead>${ttHead(r)}</thead><tbody>${body}</tbody></table>`;
+}
+function roomGridHTML(rt){
+  const r=S.result;
+  let body=studyRow(r);
+  for(let p=0;p<r.M;p++){
+    const pr=S.periods[p]||{name:PERIOD_NAMES[p],start:'',end:''};
+    body+=`<tr><td class="time-col"><b>${pr.name}</b>${pr.start||''}<br>${pr.end||''}</td>`;
+    for(let d=0;d<r.D;d++){
+      const slot=d*r.M+p;
+      if(r.fixed[slot]){body+='<td class="fixed"></td>';continue}
+      const uses=[];
+      S.classes.forEach(c=>{const cell=r.grid[c.id][slot];if(cell){const s=subjectById(cell.sid);if(s&&s.room===rt)uses.push({c,s})}});
+      const cap=S.rooms[rt]>0?S.rooms[rt]:99;
+      if(uses.length){
+        body+=`<td class="${uses.length>cap?'unassigned':''}" style="padding:3px"><div style="font-size:11px;line-height:1.35">${uses.map(u=>`<div><b style="color:var(--pine-d)">${esc(u.c.name)}</b> ${u.s.name}</div>`).join('')}</div></td>`;
+      }else body+='<td class="empty-cell"></td>';
+    }
+    body+='</tr>';
+    if(p===r.morning-1)body+=`<tr><td class="time-col break"><b>午休</b></td><td class="break" colspan="${r.D}">${S.lunch.start}–${S.lunch.end}</td></tr>`;
+  }
+  return `<table class="timetable"><colgroup><col class="time-col">${Array(r.D).fill('<col>').join('')}</colgroup><thead>${ttHead(r)}</thead><tbody>${body}</tbody></table>`;
+}
+
+VIEWS.result=()=>{
+  if(!S.result){
+    return `<div class="card"><div class="empty">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#8fa39b" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
+      <b>尚未產生課表</b>完成前面步驟後，到「一鍵排課」讓系統自動編排。
+      <div class="btn-row" style="justify-content:center"><button class="btn primary" id="goGen">前往一鍵排課</button></div></div></div>`;
+  }
+  const r=S.result;
+  const classOpts=S.classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const teacherOpts=S.teachers.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const roomTypes=[...new Set(S.subjects.filter(s=>s.room).map(s=>s.room))];
+  const roomOpts=roomTypes.map(rt=>`<option value="${rt}">${ROOM_NAMES[rt]}（${S.rooms[rt]||0} 間）</option>`).join('');
+  const tabs=[['class','班級課表'],['teacher','教師課表'],['room','場地課表'],['load','負荷分析'],['warn',`衝突警示${r.warnings.length?`（${r.warnings.length}）`:''}`]];
+  return `
+  <div class="card" style="padding:16px 20px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>排課結果</b>
+      <span class="pill ${r.warnings.length?'gold':'green'}">${r.warnings.length?r.warnings.length+' 項警示':'零警示'}</span>
+      <span class="pill gray">產生時間：${r.generatedAt}</span>
+      <span class="pill gray">最佳化分數：${r.score}</span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="btnPrint">列印／存 PDF</button>
+      <button class="btn sm" id="btnCsv">下載 CSV</button>
+      <button class="btn sm primary" id="btnRerun">重新排課</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tt-tabs">${tabs.map(t=>`<button class="tt-tab ${TT.tab===t[0]?'active':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+    <div id="ttBody"></div>
+  </div>`;
+};
+function renderTab(){
+  const r=S.result;const body=$('#ttBody');if(!body)return;
+  if(TT.tab==='class'){
+    const cur=TT.cid&&classById(TT.cid)?TT.cid:S.classes[0].id;TT.cid=cur;
+    const c=classById(cur);
+    body.innerHTML=`<div class="tt-toolbar">
+      <select id="selClass">${S.classes.map(x=>`<option value="${x.id}" ${x.id===cur?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+      <span class="hint">點擊任一格可與其他節次交換，或更換授課教師</span></div>
+      <div id="classGridWrap">${classGridHTML(cur)}</div>
+      <div class="legend">${S.subjects.filter(s=>S.groups.some(g=>g.classId===cur&&g.subjectId===s.id)).slice(0,14).map(s=>`<span><i style="background:${subjColor(s)}"></i>${s.name}</span>`).join('')}</div>`;
+    $('#selClass').onchange=e=>{TT.cid=e.target.value;renderTab()};
+    $all('#classGridWrap td[data-slot]').forEach(td=>td.onclick=()=>cellModal(cur,+td.dataset.slot));
+  }else if(TT.tab==='teacher'){
+    const cur=TT.tid&&teacherById(TT.tid)?TT.tid:(S.teachers[0]&&S.teachers[0].id);
+    if(!cur){body.innerHTML='<div class="empty"><b>尚無教師</b></div>';return}
+    body.innerHTML=`<div class="tt-toolbar"><select id="selTeacher">${S.teachers.map(x=>`<option value="${x.id}" ${x.id===cur?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>${teacherGridHTML(cur)}`;
+    $('#selTeacher').onchange=e=>{TT.tid=e.target.value;renderTab()};
+  }else if(TT.tab==='room'){
+    const types=[...new Set(S.subjects.filter(s=>s.room).map(s=>s.room))];
+    if(!types.length){body.innerHTML='<div class="empty"><b>沒有使用專科教室的科目</b></div>';return}
+    const cur=TT.rt&&types.includes(TT.rt)?TT.rt:types[0];TT.rt=cur;
+    body.innerHTML=`<div class="tt-toolbar"><select id="selRoom">${types.map(rt=>`<option value="${rt}" ${rt===cur?'selected':''}>${ROOM_NAMES[rt]}（${S.rooms[rt]||0} 間）</option>`).join('')}</select></div>${roomGridHTML(cur)}`;
+    $('#selRoom').onchange=e=>{TT.rt=e.target.value;renderTab()};
+  }else if(TT.tab==='load'){
+    body.innerHTML=loadAnalysisHTML();
+    $('#btnAiCheck').onclick=aiHealthCheck;
+  }else if(TT.tab==='warn'){
+    body.innerHTML=`<div style="margin-bottom:12px"><button class="btn gold sm" id="btnAiCheck2">AI 課表健診</button></div>
+      ${r.warnings.length?r.warnings.map(w=>`<div class="rule-card"><div class="ricon">${svgIcon('warn',16)}</div><div><b>${w.type==='red'?'硬性衝突':'場地提醒'}</b><p style="color:${w.type==='red'?'var(--cinnabar)':'var(--gold)'}">${esc(w.text)}</p></div></div>`).join('')
+      :'<div class="empty"><b>沒有任何衝突或警示</b>教師不撞堂、不超時，專科教室亦無超用。</div>'}`;
+    $('#btnAiCheck2').onclick=aiHealthCheck;
+  }
+}
+function loadAnalysisHTML(){
+  const r=S.result;
+  const trows=r.stats.teachers.map(st=>{
+    const t=teacherById(st.tid);const max=Math.max(1,...st.perDay);const cap=t.maxDaily||S.maxDaily;
+    const over=max>cap;
+    const bars=st.perDay.map(n=>`<div style="flex:1;text-align:center"><div class="bar"><i class="${n>cap?'bad':n>=cap?'warn':''}" style="width:${Math.min(100,n/Math.max(cap,1)*100)}%"></i></div><div class="hint">${n}</div></div>`).join('');
+    return `<tr><td style="text-align:left;font-weight:500">${esc(t.name)}</td><td>${st.total}</td>
+      <td style="min-width:220px"><div style="display:flex;gap:5px;align-items:flex-end">${bars}</div></td>
+      <td>${max}</td><td>${st.gaps}</td>
+      <td>${over?'<span class="pill red">超量</span>':st.gaps>3?'<span class="pill gold">空堂偏多</span>':'<span class="pill green">正常</span>'}</td></tr>`;
+  }).join('');
+  const cblocks=r.stats.classes.map(cs=>{
+    const c=classById(cs.cid);
+    const bars=cs.corePerDay.map(n=>`<div style="flex:1;text-align:center"><div class="bar"><i class="${Math.max(...cs.corePerDay)-Math.min(...cs.corePerDay)>=2?'warn':''}" style="width:${Math.min(100,n/4*100)}%"></i></div><div class="hint">${n}</div></div>`).join('');
+    return `<tr><td style="text-align:left">${esc(c.name)}</td>
+      <td style="min-width:220px"><div style="display:flex;gap:5px;align-items:flex-end">${bars}</div></td>
+      <td>${cs.corePerDay.join('、')}</td>
+      <td>${Math.max(...cs.corePerDay)-Math.min(...cs.corePerDay)>=2?'<span class="pill gold">日夜不均</span>':'<span class="pill green">均衡</span>'}</td></tr>`;
+  }).join('');
+  return `
+  <div class="tt-toolbar"><button class="btn gold sm" id="btnAiCheck">AI 課表健診（選用）</button><span class="hint">數值為每日主科（含社會科）節數，柱狀越高當天認知負荷越重</span></div>
+  <div id="aiCheckOut"></div>
+  <h3 style="color:var(--pine-d);margin:14px 0 8px">教師授課負荷</h3>
+  <div class="table-wrap"><table class="data" style="table-layout:fixed">
+    <colgroup><col style="width:14%"><col style="width:9%"><col style="width:34%"><col style="width:9%"><col style="width:9%"><col style="width:14%"></colgroup>
+    <thead><tr><th style="text-align:left">教師</th><th>每週</th><th>${DAY_NAMES.slice(0,r.D).join(' / ')}</th><th>单日最高</th><th>空堂數</th><th>狀態</th></tr></thead>
+    <tbody>${trows||'<tr><td colspan="6" class="hint">無資料</td></tr>'}</tbody></table></div>
+  <h3 style="color:var(--pine-d);margin:18px 0 8px">班級每日認知負荷</h3>
+  <div class="table-wrap"><table class="data" style="table-layout:fixed">
+    <colgroup><col style="width:16%"><col style="width:40%"><col style="width:22%"><col style="width:14%"></colgroup>
+    <thead><tr><th style="text-align:left">班級</th><th>${DAY_NAMES.slice(0,r.D).join(' / ')}</th><th>主科節數</th><th>均衡度</th></tr></thead>
+    <tbody>${cblocks}</tbody></table></div>`;
+}
+async function aiHealthCheck(){
+  const out=$('#aiCheckOut');
+  if(!S.ai.key){aiSettingsModal();return}
+  out.innerHTML='<span class="pill gray">AI 健診分析中…</span>';
+  try{
+    const r=S.result;
+    const brief=r.stats.teachers.map(st=>{const t=teacherById(st.tid);return `${t.name}: 每週${st.total}節, 每日[${st.perDay.join(',')}], 空堂${st.gaps}`}).join('\n');
+    const warn=r.warnings.map(w=>w.text).join('\n')||'無';
+    const prompt=`你是資深學校教務主任。以下是 AI 自動排課後的負荷資料，請用繁體中文給出 5 到 8 條具體、可執行的調整建議（例如哪位老師哪一天可與誰交換什麼課），不要客套話。
+教師負荷（每日順序為週一到週${['一','二','三','四','五','六'][r.D-1]}）：
+${brief}
+系統警示：
+${warn}
+每日共 ${r.M} 節，上午 ${r.morning} 節。`;
+    const txt=await aiChat(prompt,{json:false,temperature:.4});
+    out.innerHTML=`<div class="card" style="margin:10px 0;background:var(--pine-ll)"><b>AI 健診建議</b><div style="white-space:pre-wrap;margin-top:8px;font-size:13.5px;line-height:1.9">${esc(txt)}</div></div>`;
+  }catch(e){out.innerHTML=`<span class="pill red">${esc(e.message)}</span>`}
+}
+
+/* ===== 手動微調：交換節次 / 更換教師 ===== */
+function cellModal(cid,slot){
+  const r=S.result;const cell=r.grid[cid][slot];
+  if(!cell||cell.fixed)return;
+  const c=classById(cid),s=subjectById(cell.sid);
+  const gp=S.groups.find(g=>g.id===cell.gid);
+  const cands=S.teachers.filter(t=>t.subs.includes(cell.sid));
+  modalOpen(`<div class="m-head"><h3>${esc(c.name)} · ${DAY_NAMES[Math.floor(slot/r.M)]}${S.periods[slot%r.M].name}</h3></div>
+  <div class="m-body">
+    <p style="margin-bottom:12px">目前：<b style="color:${subjColor(s)}">${s.name}</b>，教師：<b>${cell.tid?esc(teacherById(cell.tid).name):'待聘'}</b></p>
+    <button class="btn primary" id="swapMode">進入「交換節次」模式</button>
+    <div class="hint" id="swapHint" style="margin:8px 0 0"></div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <label class="fld"><b>更換此科目授課教師（將自動重新排課以避免撞堂）</b>
+      <select id="chgTeacher"><option value="">— 請選擇 —</option>${cands.map(t=>`<option value="${t.id}" ${gp.teacherId===t.id?'selected':''}>${esc(t.name)}（${teacherLoad(t.id)}節/週）</option>`).join('')}</select></label>
+  </div>
+  <div class="m-foot"><button class="btn" onclick="modalClose()">關閉</button><button class="btn primary" id="applyChgTeacher" disabled>更換並重新排課</button></div>`);
+  $('#swapMode').onclick=()=>{
+    modalClose();TT.pickId=cid;TT.pickSlot=slot;
+    document.querySelectorAll('#classGridWrap td').forEach(td=>td.classList.remove('pick'));
+    const td=document.querySelector(`#classGridWrap td[data-slot="${slot}"]`);
+    if(td)td.classList.add('pick');
+    toast('請點擊同一班要交換的另一個節次（再點原格取消）');
+  };
+  $('#chgTeacher').onchange=e=>$('#applyChgTeacher').disabled=!e.target.value;
+  $('#applyChgTeacher').onclick=async()=>{
+    const tid=$('#chgTeacher').value;gp.teacherId=tid;save();modalClose();
+    toast('已更換教師，正在重新排課…');location.hash='generate';
+    setTimeout(()=>$('#runSolver').click(),250);
+  };
+}
+function handleSecondPick(cid,slot){
+  const r=S.result;
+  if(slot===TT.pickSlot){TT.pickId=null;TT.pickSlot=null;renderTab();return}
+  const s1=TT.pickSlot,s2=slot;
+  const a=r.grid[cid][s1],b=r.grid[cid][s2];
+  if(!a||a.fixed||(b&&b.fixed)){toast('固定活動時段不可交換','err');TT.pickId=null;renderTab();return}
+  const {busy,roomUse}=buildBusy();
+  // 教師可行性：暫時撤離 a(s1)、b(s2) 後檢查新位置
+  const teacherOK=(cell,target,other)=>{
+    if(!cell||!cell.tid)return true;
+    let n=busy[cell.tid][target];
+    if(other&&other.tid===cell.tid)n=Math.max(0,n-1);
+    if(n>0)return false;
+    const t=teacherById(cell.tid),d=Math.floor(target/r.M),p=target%r.M;
+    if(t&&(t.unavail||[]).includes(d+'-'+p))return false;
+    return true;
+  };
+  const roomOK=(cell,target,other)=>{
+    if(!cell)return true;
+    const rt=subjectById(cell.sid).room;if(!rt)return true;
+    const cap=S.rooms[rt]>0?S.rooms[rt]:99;
+    let n=roomUse[rt+'|'+target]||0;
+    if(other){const ort=subjectById(other.sid).room;if(ort===rt)n=Math.max(0,n-1)}
+    return n<cap;
+  };
+  const policyOK=(cell,target)=>{
+    if(!cell)return true;
+    const d=Math.floor(target/r.M),p=target%r.M,cat=subjectById(cell.sid).cat;
+    if(S.rules.afterLunch&&p===r.morning&&(cat==='core'||cat==='society'||cell.sid==='pe'))return false;
+    if(S.rules.noRepeat){
+      for(let q=0;q<r.M;q++){const pos=d*r.M+q;
+        if(pos===s1||pos===s2)continue;
+        const cc=r.grid[cid][pos];if(cc&&!cc.fixed&&cc.sid===cell.sid)return false;
+      }
+    }
+    return true;
+  };
+  if(!teacherOK(a,s2,b)||!teacherOK(b,s1,a)||!roomOK(a,s2,b)||!roomOK(b,s1,a)||!policyOK(a,s2)||!policyOK(b,s1)){
+    toast('交換後會造成撞堂、違反午休保護或同日同科重複，已取消','err');
+    TT.pickId=null;renderTab();return;
+  }
+  r.grid[cid][s1]=b?{...b,clash:false}:null;
+  r.grid[cid][s2]={...a,clash:false};
+  TT.pickId=null;TT.pickSlot=null;save();renderTab();toast('已交換兩個節次，可至「衝突警示」分頁檢查','ok');
+}
+
+MOUNTS.result=()=>{
+  if(!S.result){const g=$('#goGen');if(g)g.onclick=()=>location.hash='generate';return}
+  $all('.tt-tab').forEach(b=>b.onclick=()=>{TT.tab=b.dataset.tab;$all('.tt-tab').forEach(x=>x.classList.toggle('active',x===b));renderTab()});
+  renderTab();
+  $('#btnRerun').onclick=()=>location.hash='generate';
+  $('#btnCsv').onclick=exportCSV;
+  $('#btnPrint').onclick=printAll;
+  document.onclick=null;
+  $('#classGridWrap')&&($('#classGridWrap').onclick=e=>{
+    if(TT.pickId&&TT.tab==='class'){
+      const td=e.target.closest('td[data-slot]');
+      if(td&&TT.cid){handleSecondPick(TT.cid,+td.dataset.slot)}
+    }
+  });
+};
+
+/* =========================================================
+   十九、匯出、匯入、列印
+========================================================= */
+function download(name,content,mime){
+  const blob=new Blob([content],{type:mime||'text/plain;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function exportJSON(){
+  const d=clone(S);d.ai=Object.assign({},S.ai,{key:''});
+  download((S.school||'智慧排課')+'_排課專案.json',JSON.stringify(d,null,2),'application/json');
+}
+function importProjectJSON(text){
+  try{
+    const d=JSON.parse(text);const def=defaultState();
+    S=Object.assign(def,d);
+    S.flags=Object.assign(def.flags,d.flags||{});S.rules=Object.assign(def.rules,d.rules||{});
+    S.ai=Object.assign(def.ai,d.ai||{});S.prior=Object.assign(def.prior,d.prior||{});
+    S.rooms=Object.assign(def.rooms,d.rooms||{});
+    save();route();toast('專案已匯入','ok');
+  }catch(e){toast('JSON 解析失敗：'+e.message,'err')}
+}
+function csvCell(v){v=String(v??'');return /[,"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function gridToCSVBlock(title,r,mode,id){
+  const lines=[];
+  lines.push([title,''].concat(DAY_NAMES.slice(0,r.D)).map(csvCell).join(','));
+  for(let p=0;p<r.M;p++){
+    const pr=S.periods[p]||{name:PERIOD_NAMES[p]};
+    const row=[pr.name+' '+(pr.start||'')];
+    for(let d=0;d<r.D;d++){
+      const slot=d*r.M+p;let txt='';
+      if(mode==='class'){
+        const cell=r.grid[id][slot];
+        if(cell){if(cell.fixed)txt=cell.fixed;else txt=subjectById(cell.sid).name+(cell.tid?'（'+teacherById(cell.tid).name+'）':'（待聘）')}
+      }else{
+        const found=[];
+        S.classes.forEach(c=>{const cell=r.grid[c.id][slot];if(cell&&cell.tid===id)found.push(c.name+subjectById(cell.sid).name)});
+        txt=found.join('、');
+      }
+      row.push(txt);
+    }
+    lines.push(row.map(csvCell).join(','));
+  }
+  return lines.join('\n');
+}
+function exportCSV(){
+  if(!S.result)return toast('請先完成排課','err');
+  const r=S.result;const blocks=[];
+  blocks.push((S.school||'學校')+' 全校課表（產生時間：'+r.generatedAt+'）');
+  S.classes.forEach(c=>{blocks.push('\n'+gridToCSVBlock(c.name+' 班級課表',r,'class',c.id))});
+  S.teachers.forEach(t=>blocks.push('\n'+gridToCSVBlock(t.name+' 教師課表',r,'teacher',t.id)));
+  download((S.school||'智慧排課')+'_全校課表.csv','﻿'+blocks.join('\n'),'text/csv;charset=utf-8');
+}
+function printAll(){
+  if(!S.result)return toast('請先完成排課','err');
+  const r=S.result;
+  let html='';
+  S.classes.forEach(c=>{
+    html+=`<div class="print-block"><h2>${S.school?esc(S.school)+' · ':''}${esc(c.name)} 課表</h2>${classGridHTML(c.id)}</div>`;
+  });
+  S.teachers.forEach(t=>{
+    html+=`<div class="print-block"><h2>${esc(t.name)}老師 授課課表</h2>${teacherGridHTML(t.id)}</div>`;
+  });
+  $('#printArea').innerHTML=html;
+  setTimeout(()=>window.print(),150);
+}
+function exportModal(){
+  modalOpen(`<div class="m-head"><h3>儲存／匯出</h3></div>
+  <div class="m-body">
+    <div class="rule-card"><div class="ricon">${svgIcon('dash',16)}</div><div style="flex:1"><b>排課專案 JSON</b><p>完整備份所有設定與課表，可於其他電腦「匯入專案」接續作業。</p></div><button class="btn sm primary" id="exJson">下載</button></div>
+    <div class="rule-card"><div class="ricon">${svgIcon('dash',16)}</div><div style="flex:1"><b>全校課表 CSV</b><p>含所有班級與教師課表，可用 Excel 開啟再編修（需先完成排課）。</p></div><button class="btn sm primary" id="exCsv">下載</button></div>
+    <div class="rule-card"><div class="ricon">${svgIcon('dash',16)}</div><div style="flex:1"><b>列印／另存 PDF</b><p>逐班、逐教師排版，適合印出公布或送交校內審查。</p></div><button class="btn sm primary" id="exPrint">開啟列印</button></div>
+    <div class="hint" style="margin-top:8px">系統亦已於本機瀏覽器自動儲存最新狀態，重新整理不會遺失。</div>
+  </div>`);
+  $('#exJson').onclick=()=>{exportJSON();modalClose()};
+  $('#exCsv').onclick=()=>{exportCSV();modalClose()};
+  $('#exPrint').onclick=()=>{modalClose();setTimeout(printAll,80)};
+}
+$('#btnSave').onclick=exportModal;
+$('#btnImport').onclick=()=>{window._fileMode='project';$('#fileInput').click()};
+$('#fileInput').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    if(f.name.endsWith('.json')){importProjectJSON(rd.result)}
+    else{
+      window._priorImport=rd.result;
+      if(location.hash!=='#prior'){location.hash='prior'}
+      else{const ta=$('#priorText');if(ta){ta.value=rd.result;toast('檔案內容已載入，請點「解析規律格式」')}}
+    }
+    e.target.value='';
+  };
+  rd.readAsText(f,'UTF-8');
+};
+
+/* =========================================================
+   二十、範例資料與初始化
+========================================================= */
+function loadSample(){
+  S=defaultState();
+  S.school='示例：海星完全中學';
+  S.junior={J1:2,J2:2,J3:1};S.senior={S1:2,S2:1,S3:1};
+  syncClasses();
+  // 依課程需求自動補足教師
+  const total={};S.groups.forEach(g=>total[g.subjectId]=(total[g.subjectId]||0)+g.hours);
+  const letters='ABCDEFGHIJKLMN';
+  Object.entries(total).forEach(([sid,h])=>{
+    const cap=S.maxDaily*S.days*0.85;
+    const n=Math.max(1,Math.ceil(h/cap));
+    const s=subjectById(sid);
+    for(let i=0;i<n;i++)S.teachers.push({id:uid('t'),name:s.name+'教師'+letters[i],subs:[sid],maxDaily:S.maxDaily,homeroom:null,unavail:[]});
+  });
+  autoAssign();
+  // 指定導師：優先該班國文教師，確保一人一班
+  const used=new Set();
+  S.classes.forEach(c=>{
+    const pick=S.groups.filter(g=>g.classId===c.id&&['chinese','english','math'].includes(g.subjectId))
+      .map(g=>teacherById(g.teacherId)).find(t=>t&&!used.has(t.id));
+    if(pick){c.homeroom=pick.id;pick.homeroom=c.id;used.add(pick.id)}
+  });
+  save();
+}
+$('#hamburger').onclick=()=>$('#sidebar').classList.toggle('open');
+
+loadState();
+if(!localStorage.getItem(LS_KEY)){ /* 首次使用 */ }
+route();
+</script>
+</body>
+</html>
